@@ -23,8 +23,8 @@ A high-level Python interface designed to make it easier to get things done with
 4. Sensitivity-based hosting capacity demand analysis
 
 #### benefits:
-1. Cross-platform compatibility
-2. Compatibility with opendssdirect.py
+1. Focus on data-driven/machine learning applications
+2. Cross-platform and compatibility with opendssdirect.py
 3. Local OpenDSS installation not necessarily required
 
 
