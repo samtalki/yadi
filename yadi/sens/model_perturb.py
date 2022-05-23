@@ -7,11 +7,11 @@ October 6th, 2021
 """
 
 import numpy as np
-import dss_model
+import yadi.dss.model as model
 import pandas as pd
 import warnings
 
-class OpenDSS_Sensitivities(dss_model.OpenDSS_Data):
+class OpenDSS_Sensitivities(model.OpenDSS_Data):
 
     def __init__(self,redirects,verbose=True):
         super().__init__(redirects,verbose)

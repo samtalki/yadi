@@ -8,14 +8,14 @@ October 6th, 2021
 
 import numpy as np
 import pandas as pd
-import dss_model 
+import yadi.dss.model as model 
 import warnings
 from tqdm import tqdm
 
 #Optional: Turn off complex value warnings
 #warnings.simplefilter("ignore", np.ComplexWarning)
 
-class OpenDSS_Timeseries(dss_model.OpenDSS_Data):
+class OpenDSS_Timeseries(model.OpenDSS_Data):
 
     def __init__(self,redirects,time_step,simulation_steps):
         super().__init__(redirects)
