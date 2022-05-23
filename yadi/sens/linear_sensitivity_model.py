@@ -29,15 +29,9 @@ from jaxopt import ProjectedGradient
 #Finite difference function
 from yadi.utils import fdiff
 
-def predict(S,v0,dx):
-    """Finite difference prediction of the voltage magnitudes"""
-    #Finite difference measurements
-    dp,dq = dx
-    #offset v0, vmag-active power sensitivities Svp, and vmag-reactive power sensitivities Svq
-    Svp,Svq = S 
-    return v0 + jnp.dot(Svp,dp) + jnp.dot(Svq,dq)  #Multiple linear regression model.
-  
-def train(v,p,q):
+
+#TODO
+def train(v,p,q,lamb0=1e-5):
     """Given AMI dataset matrices v,p,q of size (M x N), please complete the following tasks:
         1.Form finite difference matrices DV,DP,DQ of size ((M-1)xN)
         2. Solve the regression problem with your favorite gradient descent method (notice that I've formed the gradient for you below).
@@ -48,66 +42,79 @@ def train(v,p,q):
             - What is the largest generation/demand dx so that we can guarantee a v+ dv<1.05? 
             - What about a v + dv >0.95? 
     """
-    def l2_loss(S,v0,dx,dv):
-        """The training loss is the standard least-squares l2 loss."""
-        dv_hat = predict(S, v0, dx)
-        return jnp.linalg.norm(dv_hat - dv)**2
-
-    def l2_reg(S,lamb):
-        """The standard l2 regularization term, with optional separate lambdas for active/reactive power voltage magntiude sensitivities"""
-        if(len(lamb)>1):
-            assert len(lamb) == len(S)
-            (l_vp,l_vq) = lamb
-            (Svp,Svq) = S
-            reg = l_vp*jnp.linalg.norm(Svp) + l_vq*jnp.linalg.norm(Svq)
-        elif(len(lamb)==1 and len(S)==2):
-            (Svp,Svq) = S
-            reg = lamb*jnp.linalg.norm(Svp) + lamb*jnp.linalg.norm(Svq)
-        else:
-            reg = 0
-        return reg
-    
-    def ridge_reg_objective(params, lamb, X, y):
-        residuals = jnp.dot(X, params) - y
-        return jnp.mean(residuals ** 2) + 0.5 * lamb * jnp.dot(params ** 2)
-
-    def ridge_reg_solution(lamb, X, y,
-        init_params,
-        maxiter=10000,implicit_diff=True
-    ):
-        gd = GradientDescent(fun=ridge_reg_objective, maxiter=maxiter, implicit_diff=implicit_diff)
-        sol= gd.run(init_params, l2reg=lamb, X=X, y=y).params
-        return sol
-
-    def solution_jacobian(arg,lamb,X,y,sol=None):
-        """
-        Compute the jacobian of the solution with respect to argnum evaluated at (params,state)
-        """
-        if sol is None:
-            sol = ridge_reg_solution
-        if(arg==0 or 'lamb' in arg):
-            jac = lambda lamb,X,y : jacobian(sol, argnums=0)(lamb, X, y)
-        elif(arg==1 or 'X' in arg): 
-            jac = lambda lamb,X,y : jacobian(sol, argnums=1)(lamb, X, y)
-        return jac
-
-
-
+    m,n = v.shape
     #Take finite differences
     dv,dp,dq = fdiff(v),fdiff(p),fdiff(q)
-    grad = jit(grad(l2_loss))
-    return S,v0
-    
+    dx = jnp.vstack((dp.T,dq.T,jnp.ones(dp.shape[1]))).T
+    init_sens = jnp.transpose(jnp.dot(jnp.linalg.pinv(dx),dv))
+    dvdp,dvdq = init_sens[:,:n],init_sens[:,n:]
+    sol = ridge_reg_solution(
+        init_sens=(dvdp,dvdq),
+        lamb=lamb0,
+        X=dx,y=dv
+    )
+    (Svp,Svq) = sol
+    return Svp,Svq
+
+#TODO
+def test(v,p,q):
+    """Given test AMI dataset matrices v,p,q of size (M x N), please complete the following tasks:
+        1. Evalute the performance of the learned sensitivity model
+        2. Compute various error metrices
+    """
+    pass
+
+def predict(sens,v0,X):
+    """Finite difference prediction of the voltage magnitudes"""
+    #offset v0, vmag-active power sensitivities Svp, and vmag-reactive power sensitivities Svq
+    Svp,Svq = sens 
+    #Finite difference measurements
+    p,q = X
+    return v0 + jnp.dot(Svp,p) + jnp.dot(Svq,q)  #Multiple linear regression model.
+def ridge_reg_objective(sens, lamb, X, y):
+    residuals = jnp.dot(X, sens) - y
+    return jnp.mean(residuals ** 2) + 0.5 * l2_regularizer(sens,lamb)
+
+def ridge_reg_solution(init_sens,lamb, X, y,maxiter=10000,implicit_diff=True):
+    """
+    Returns the ridge regression sensitivity model solution for a given init_sens, lamb, X, y, and other arguments.
+    """
+    gd = GradientDescent(fun=ridge_reg_objective, maxiter=maxiter, implicit_diff=implicit_diff)
+    sol= gd.run(init_sens, l2reg=lamb, X=X, y=y).params
+    return sol
+
+def solution_jacobian(arg,lamb,X,y,sol=None):
+    """
+    Compute the jacobian of the solution with respect to argnum evaluated at (params,state)
+    """
+    if sol is None:
+        sol = ridge_reg_solution
+    if(arg==0 or 'lamb' in arg):
+        jac = lambda lamb,X,y : jacobian(sol, argnums=0)(lamb, X, y)
+    elif(arg==1 or 'X' in arg): 
+        jac = lambda lamb,X,y : jacobian(sol, argnums=1)(lamb, X, y)
+    return jac(lamb,X,y)
+
+def validation_loss(l2reg):
+  sol = ridge_reg_solution(l2reg, X_train, y_train)
+  residuals = jnp.dot(X_val, params) - y_val
+  return jnp.mean(residuals ** 2)
+
+def loss_l2reg_jacobian(l2reg):
+    df = lambda l2reg: grad(validation_loss)(l2reg)
 
 
-# Build a toy dataset.
-inputs = jnp.array([[0.52, 1.12,  0.77],
-                   [0.88, -1.08, 0.15],
-                   [0.52, 0.06, -1.30],
-                   [0.74, -2.49, 1.39]])
-targets = jnp.array([True, True, False, True])
+def l2_regularizer(sens,lamb):
+    """The standard l2 regularization term, with optional separate lambdas for active/reactive power voltage magntiude sensitivities"""
+    if(len(lamb)>1):
+        assert len(lamb) == len(S)
+        (l_vp,l_vq) = lamb
+        (Svp,Svq) = sens
+        regularization = l_vp*jnp.dot(Svp**2) + l_vq*jnp.dot(Svq**2)
+    elif(len(lamb)==1 and len(sens)==2):
+        (Svp,Svq) = sens
+        regularization = lamb*jnp.dot(Svp**2) + lamb*jnp.dot(Svq**2)
+    else:
+        regularization = 0
+    return regularization
 
-# Initialize random model coefficients
-key, W_key, b_key = random.split(key, 3)
-W = random.normal(W_key, (3,))
-b = random.normal(b_key, ())
