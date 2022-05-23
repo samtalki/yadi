@@ -16,12 +16,18 @@
 #- How to Think in JAX: https://jax.readthedocs.io/en/latest/notebooks/thinking_in_jax.html
 #- The JAX Autodiff Cookbook: https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html
 #---
+#JAX imports
 import jax.numpy as jnp
 from jax import grad, jit, vmap
+from jax import jacobian
 from jax import random
-
+#RNG key
 key = random.PRNGKey(0)
-
+#Gradient descent solvers
+from jaxopt import GradientDescent
+from jaxopt import ProjectedGradient
+#Finite difference function
+from yadi.utils import fdiff
 
 def predict(S,v0,dx):
     """Finite difference prediction of the voltage magnitudes"""
@@ -30,21 +36,7 @@ def predict(S,v0,dx):
     #offset v0, vmag-active power sensitivities Svp, and vmag-reactive power sensitivities Svq
     Svp,Svq = S 
     return v0 + jnp.dot(Svp,dp) + jnp.dot(Svq,dq)  #Multiple linear regression model.
-
-
-def fdiff(A,norm=1):
-    """Given an (MxN) data matrix A, compute the finite diference matrix DA
-    Params:
-        norm: the amount to normalize A(k+1)-A(k) by
-    """
-    (M,N) = A.shape
-    DA = jnp.divide(
-        jnp.diff(A,axis=0),
-        norm)
-    assert DA.shape == (M-1,N)
-    return DA
-    
-
+  
 def train(v,p,q):
     """Given AMI dataset matrices v,p,q of size (M x N), please complete the following tasks:
         1.Form finite difference matrices DV,DP,DQ of size ((M-1)xN)
@@ -56,16 +48,50 @@ def train(v,p,q):
             - What is the largest generation/demand dx so that we can guarantee a v+ dv<1.05? 
             - What about a v + dv >0.95? 
     """
-    
-    # Training loss is the negative log-likelihood of the training examples.
-    def l2_loss(dv,S,v0, dx):
+    def l2_loss(S,v0,dx,dv):
+        """The training loss is the standard least-squares l2 loss."""
         dv_hat = predict(S, v0, dx)
-        resid_sq = jnp.linalg.norm(dv_hat - dv)**2
-        return jnp.sum(resid_sq)
+        return jnp.linalg.norm(dv_hat - dv)**2
+
+    def l2_reg(S,lamb):
+        """The standard l2 regularization term, with optional separate lambdas for active/reactive power voltage magntiude sensitivities"""
+        if(len(lamb)>1):
+            assert len(lamb) == len(S)
+            (l_vp,l_vq) = lamb
+            (Svp,Svq) = S
+            reg = l_vp*jnp.linalg.norm(Svp) + l_vq*jnp.linalg.norm(Svq)
+        elif(len(lamb)==1 and len(S)==2):
+            (Svp,Svq) = S
+            reg = lamb*jnp.linalg.norm(Svp) + lamb*jnp.linalg.norm(Svq)
+        else:
+            reg = 0
+        return reg
     
-    #TODO: Add an L2 regularization term
-    def l2_reg(S):
-        pass
+    def ridge_reg_objective(params, lamb, X, y):
+        residuals = jnp.dot(X, params) - y
+        return jnp.mean(residuals ** 2) + 0.5 * lamb * jnp.dot(params ** 2)
+
+    def ridge_reg_solution(lamb, X, y,
+        init_params,
+        maxiter=10000,implicit_diff=True
+    ):
+        gd = GradientDescent(fun=ridge_reg_objective, maxiter=maxiter, implicit_diff=implicit_diff)
+        sol= gd.run(init_params, l2reg=lamb, X=X, y=y).params
+        return sol
+
+    def solution_jacobian(arg,lamb,X,y,sol=None):
+        """
+        Compute the jacobian of the solution with respect to argnum evaluated at (params,state)
+        """
+        if sol is None:
+            sol = ridge_reg_solution
+        if(arg==0 or 'lamb' in arg):
+            jac = lambda lamb,X,y : jacobian(sol, argnums=0)(lamb, X, y)
+        elif(arg==1 or 'X' in arg): 
+            jac = lambda lamb,X,y : jacobian(sol, argnums=1)(lamb, X, y)
+        return jac
+
+
 
     #Take finite differences
     dv,dp,dq = fdiff(v),fdiff(p),fdiff(q)
