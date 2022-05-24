@@ -4,11 +4,11 @@ Model-derived HC computation scheme.
 04/03/2022
 """
 import numpy as np
-import mohca_cl.dss.model as dss_model
+import yadi.dss.model as dss_model
 import opendssdirect as dss
 from numba import jit
 
-class ModelHC(dss_model.DSS_Model):
+class ModelHC(dss_model.OpenDSS_Data):
 
     def __init__(self,redirects) -> None:
         super().__init__(redirects)
