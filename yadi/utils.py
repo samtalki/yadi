@@ -1,3 +1,4 @@
+import yadi.data.ami as ami
 import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt

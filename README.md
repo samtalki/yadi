@@ -2,7 +2,7 @@
 ![yadi](assets/logo/yadi_logo_clear_purple_tilt.png)
 
 # ``yadi``: yet another DSS interface.
-A high-level Python interface designed to make it easier to get things done with the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) and is designed by the Electric Power Research Institute. We make heavy use of [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and build upon it. 
+A Python interface designed to help get things done better, and do new things with the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) and is designed by the Electric Power Research Institute. We make heavy use of [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and PyDSS and build upon them.
 
 ## Features
 ``yadi`` gives you a number of tools to improve your distribution system research and accelerate the integration of OpenDSS into your studies. 

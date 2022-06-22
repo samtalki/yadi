@@ -6,6 +6,7 @@ matplotlib
 seaborn
 
 OpenDSSDirect.py[extras]
+dss_python
 
 numpy
 jax
