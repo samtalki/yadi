@@ -13,20 +13,24 @@ The distribution network modeling community is hiding from modern data science w
 ### Features
 ``yadi`` gives you a number of tools to improve your distribution system research and accelerate the integration of OpenDSS into your studies. ``yadi`` aims to provide a **fresh, modern, open-source approach to the mostly closed-source world of distribution networks** with support for several common algorithms that are central to modern distribution systems research. Below, we summarize some of these features, although it is always a work in progress. Check back in the future for more, or open an issue or pull request. 
 
-#### circuit-based/network-based/model-based analysis
+#### Turnkey network model analysis tools
 1. Simplified circuit data access, collection, and analysis
 2. Time series analysis
 3. Sensitivity analysis
 5. Electric vehicle analysis
 6. Iterative hosting capacity analysis
 
-#### measurement-based/sample-based/model-free analysis
-1. Advanced metering infrastructure (AMI) dataset generation
+#### Turnkey measurement-based/sample-based/model-free models for the power flow equations
+1. Quasi-static time-series (QSTS) dataset generation with user-controllable parameters
 2. Regression-based sensitivity analysis
 3. Sensitivity-based hosting capacity generation analysis
 4. Sensitivity-based hosting capacity demand analysis
 
-#### benefits:
+## FAQ/Additional benefits:
+
+Not convinced? Here's some more info.
+
+### Main benefits:
 1. Focus on data-driven/machine learning applications
 2. Cross-platform and compatibility with opendssdirect.py
 3. Local OpenDSS installation not necessarily required
