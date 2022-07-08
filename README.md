@@ -1,14 +1,18 @@
 
 ![yadi](assets/logo/yadi_logo_clear_purple_tilt.png)
 
-# ``yadi``: yet another DSS interface.
-A Python interface designed to help get things done better, and do new things with the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) and is designed by the Electric Power Research Institute. We make heavy use of [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and PyDSS and build upon them.
+# ``yadi``: yet another DSS interface, but it makes sense.
+`yadi` is software designed to help you tame the black magic that is distribution network models and make decisions with distribution network measurement data. It is primarily built on the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) by its authors, the Electric Power Research Institute. We interface with OpenDSS via [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and PyDSS. 
 
-## Features
-``yadi`` gives you a number of tools to improve your distribution system research and accelerate the integration of OpenDSS into your studies. 
+## Why `yadi`?
 
-### Summary
-``yadi`` provides a fresh, modern approach with support for seamless access to several key features crucial for disitrubtion system studies.
+The distribution network modeling community is hiding from modern data science workflows. Many distribution researchers simply implement the same algorithms idiosyncratically over and over again, which has ***severely* limited** the ability of the power system community to develop higher-order iterations of network model analysis tools and algorithms. `yadi` makes it significantly easier to ask the kind of research questions that are useful for the modern, data-driven eletric power system engineer.
+
+`yadi` doesn't stop with making OpenDSS friendlier for modern data science workflows. It also welcomes the [Julia programming language](https://julialang.org/) and its benefits with open arms, and liberally makes uses of `PowerModelsDistribution.jl` in tandem with `OpenDSSDirect.jl` in accordance with each of their strengths. Taking advantage of Julia's speed can allow for sophisticated optimization, decision making, and control algorithms that are not possible in Python alone.
+
+### Features
+``yadi`` gives you a number of tools to improve your distribution system research and accelerate the integration of OpenDSS into your studies. ``yadi`` aims to provide a **fresh, modern, open-source approach to the mostly closed-source world of distribution networks** with support for several common algorithms that are central to modern distribution systems research. Below, we summarize some of these features, although it is always a work in progress. Check back in the future for more, or open an issue or pull request. 
+
 #### circuit-based/network-based/model-based analysis
 1. Simplified circuit data access, collection, and analysis
 2. Time series analysis
@@ -31,8 +35,8 @@ A Python interface designed to help get things done better, and do new things wi
 ## Contributors
 ### Georgia Tech
 - Samuel Talkington
-- Jorge Fernandez (admittance matrix & initialization in dss/model.py)
 - Alex Reyna (dss/ev.py,hc/ev.py,sens/ev.py)
+- Jorge Fernandez (admittance matrix & initialization in dss/model.py)
 
 New contributors are always welcome.
 
