@@ -23,6 +23,13 @@ LINE_CLASSES = ['Line', 'Xfmr']
 class OpenDSS_Data:
 
     def __init__(self, redirects, verbose=True):
+        """
+        Initializes an OpenDSS network model. 
+        
+        Params:s
+            - redirects (list): List of strings of filepaths to .dss files
+            - verbose (boolean): whether or not to print verbose logs
+        """
         self.dss = dss #dss object
         # Initialize model attributes 
         self.verbose=verbose
@@ -47,6 +54,7 @@ class OpenDSS_Data:
     
     @staticmethod
     def run_command(cmd):
+        """Runs any string command"""
         status = dss.run_command(cmd)
         if status:
             print(f'DSS Status ({cmd}): {status}')
