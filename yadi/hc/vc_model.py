@@ -17,14 +17,16 @@ class ModelHC(dss_model.OpenDSS_Data):
         """
         Get the vector of hosting capacities for every bus with a load
         """
-        loads = self.get_all_elements('loal')
+        loads = self.get_all_elements('load')
+        for load in loads:
+            break
         pass
 
-    def get_max_kw(self,bus,pf):
+    def get_max_kw(self,bus,pf=1):
         """
         Gets the maximum kW for a given bus given a power factor setting pf
         """
-        def increment_kw(bus,pf):
+        def increment_kw(bus,pf=pf):
             """
             Internal kW incrementing function
             """
