@@ -20,7 +20,10 @@ ELEMENT_CLASSES = {
 LINE_CLASSES = ['Line', 'Xfmr']
 
 
-class OpenDSS_Data:
+class DSS_Data:
+    """
+    Data class for OpenDSS network models.
+    """
 
     def __init__(self, redirects, verbose=True):
         """

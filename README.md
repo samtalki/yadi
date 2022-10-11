@@ -38,8 +38,9 @@ Not convinced? Here's some more info.
 
 ## Contributors
 ### Georgia Tech
-- Samuel Talkington
-- Alex Reyna (dss/ev.py,hc/ev.py,sens/ev.py)
+- Samuel Talkington 
+- Alejandro Owen (conservative linear approximations)
+- Alex Reyna
 - Jorge Fernandez (admittance matrix & initialization in dss/model.py)
 
 New contributors are always welcome.

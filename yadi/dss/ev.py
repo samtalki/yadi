@@ -10,7 +10,7 @@ import jax.numpy as jnp
 #Optional: Turn off complex value warnings
 #warnings.simplefilter("ignore", np.ComplexWarning)
 
-class OpenDSS_EV(perturb.OpenDSS_Sensitivities):
+class DSS_EV(perturb.DSS_Sensitivities):
 
     def __init__(self, redirects, verbose=False,unity_pf=True):
         super().__init__(redirects, verbose)
@@ -34,6 +34,6 @@ class OpenDSS_EV(perturb.OpenDSS_Sensitivities):
 
 
     def set_groups(self,group_slices):
-        """Set the groups for"""
+        """Define the nodal/secondary groups for the EV capacity planning problem"""
         for slice in group_slices:
-            self.
+            pass

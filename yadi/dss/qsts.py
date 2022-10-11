@@ -15,7 +15,7 @@ from tqdm import tqdm
 #Optional: Turn off complex value warnings
 #warnings.simplefilter("ignore", np.ComplexWarning)
 
-class OpenDSS_Timeseries(model.OpenDSS_Data):
+class DSS_Timeseries(model.DSS_Data):
 
     def __init__(self,redirects,time_step,simulation_steps):
         super().__init__(redirects)
