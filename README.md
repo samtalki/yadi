@@ -1,7 +1,7 @@
 
 ![yadi](assets/logo/yadi_logo_clear_purple_tilt.png)
 
-# ``yadi``: yet another DSS interface, but it makes sense.
+# ``yadi``: yet another DSS interface.
 `yadi` is software designed to help you tame the black magic that is distribution network models and make decisions with distribution network measurement data. It is primarily built on the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) by its authors, the Electric Power Research Institute. We interface with OpenDSS via [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and PyDSS. 
 
 ## Why `yadi`?
