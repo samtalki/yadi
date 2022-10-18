@@ -2,7 +2,11 @@ import numpy as np
 import opendssdirect as dss
 import yadi.dss.sensitivity as sensitivity
 
+
 class DSS_Secondaries(sensitivity.DSS_Sensitivities):
+    """
+    WIP: "distributed" power flow solves exploiting knowledge of secondary topology
+    """
 
     def __init__(self,redirects,verbose=False) -> None:
         super().__init__(redirects,verbose)
