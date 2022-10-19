@@ -8,12 +8,12 @@ with open('README.md') as f:
 reqs = open('requirements.txt').readlines()
 	
 setup(
-	name='mohca_cl',
+	name='yadi',
 	version='1.0.0',
 	description='yadi: yet another dss interface',
 	long_description_content_type='text/markdown',
 	long_description=long_description,
-	author='Samuel Talkington',
+	author=['Samuel Talkington','Jorge Fernandez','Amanda West','Alejandro Owen'],
 	author_email='talkington@pm.me',
 	url='https://github.com/samtalki/yadi/',
 	packages = ['yadi'],

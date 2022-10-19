@@ -5,9 +5,8 @@ Data structure for handling AMI data.
 __author__ = "Samuel Talkington"
 __contact__ = "talkington@pm.me"
 __copyright__ = "Copyright (c) 2021-Present Samuel Talkington, All Rights Reserved."
-__date__ = "2022/03/28"
 __deprecated__ = False
-__license__ = "BSD"
+__license__ = "MIT"
 __status__ = "Production"
 __version__ = "0.0.1"
 
@@ -19,12 +18,6 @@ import warnings
 import h5py 
 from tqdm import tqdm
 
-
-#Current version provided by matt
-default_data_path = "/home/sam/github/MoHCa/mohca/data/new_hc_baseline/HCAresults_AllLocations_MATRIX_withNoise_20220125T111629.mat" 
-
-#Newer data with capabilities.
-#data_path = "/home/sam/github/MoHCa/mohca/data/new_hc_baseline_xfmer/HCAresults_AllLocations_MATRIX_withNoise_20220125T111629_updated02162022.mat"
 
 class AMIData:
     """
