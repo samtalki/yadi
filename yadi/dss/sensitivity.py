@@ -8,7 +8,7 @@ All Rights Reserved
 """
 
 import numpy as np
-import mohca_cl.ga_tech.dss.model as model
+import yadi.dss.model as model
 import pandas as pd
 import os
 import warnings
