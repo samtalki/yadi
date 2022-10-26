@@ -90,7 +90,58 @@ class DSS_Secondaries(sensitivity.DSS_Sensitivities):
                 "node_names":formated_names,
                 "Ysec":Ysec
             }
-        return secondaries         
+        return secondaries    
+
+    def make_secondary_slices(self,n_secondaries = 12):
+        """
+        Make slices of the node indexes of the currently loaded opendss feeder mapping to the secondary networks
+        Params:
+            n_secondaries: Number of secondary groups in the feeder
+        """
+        
+        #Secondaries results dictionary
+        self.secondaries = {}
+
+        #Node names and node names by phase    
+        node_names = dss.Circuit.AllNodeNames()
+        a_node_names,b_node_names,c_node_names = dss.Circuit.AllNodeNamesByPhase(Phase=1),dss.Circuit.AllNodeNamesByPhase(Phase=2),dss.Circuit.AllNodeNamesByPhase(Phase=3)
+
+        #Secondary indeces
+        secondary_names = [str(i) for i in range(1,n_secondaries+1)] #Group index of the secondary names
+        
+        for sec_name in secondary_names:
+            sec_bus_idx = 0 #Counter for the bus number within the secondary
+            node_idxs_in_sec,node_names_in_sec = [],[] 
+            
+            for node_idx,node_name in enumerate(node_names):
+
+                #Collect the phase info
+                if(node_name in a_node_names):
+                    phase = 'a'
+                elif(node_name in b_node_names):
+                    phase = 'b'
+                elif(node_name in c_node_names):
+                    phase = 'c'
+                else:
+                    print("no phase for: {node_name}".format(node_name=node_name))
+                    phase = ""
+                    
+
+
+                if('sec' + sec_name + "_" in node_name): #Hacky way to separate by node name
+                    node_idxs_in_sec.append(node_idx)
+                    node_names_in_sec.append('sec' + sec_name + "_" + str(sec_bus_idx))
+                    #Increment the secondary bus index counter
+                    sec_bus_idx += 1
+                elif("trafo" + sec_name + "lv" in node_name): #Catch low voltage transformers
+                    node_idxs_in_sec.append(node_idx)
+                    node_names_in_sec.append('sec' + sec_name + "_" + "xfmrlv")
+            self.secondaries['sec' + sec_name] = {
+                "node_idxs":node_idxs_in_sec,
+                "node_names":node_names_in_sec
+            }
+        return self.secondaries         
+     
 
 def calc_vph_active_sensitivities(Y,vph):
     #Number of buses and equations
