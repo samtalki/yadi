@@ -127,19 +127,6 @@ class DSS_Data:
             # df = dss.utils.class_to_dataframe(element)
         return df
 
-    def get_line_flows(self, lname):
-        """
-        @author: Jorge Fernandez
-        Given a list of line names lname, return 4 tuple (Pjk,Qjk,pjk,qjk) 
-        """
-        # get line flows
-        lines, lines_KW_power, lines_KVAR_power = self.__get_line_powers()
-        
-        # organize line flows for node-based analysis
-        Pjk, Qjk, pjk, qjk = self.__read_line_flows(lines, lines_KW_power, lines_KVAR_power, lname)
-        return Pjk, Qjk, pjk, qjk
-
-
     def get_node_voltages(self):
         """
         @author: Samuel Talkington
@@ -247,6 +234,18 @@ class DSS_Data:
         
         return Y_net, volts
 
+
+    def get_line_flows(self, lname):
+        """
+        @author: Jorge Fernandez
+        Given a list of line names lname, return 4 tuple (Pjk,Qjk,pjk,qjk) 
+        """
+        # get line flows
+        lines, lines_KW_power, lines_KVAR_power = self.__get_circuit_line_flows()
+        
+        # organize line flows for node-based analysis
+        Pjk, Qjk, pjk, qjk = self.__read_line_flows(lines, lines_KW_power, lines_KVAR_power, lname)
+        return Pjk, Qjk, pjk, qjk
     
     def __read_line_flows(self, lines, lines_KW_power, lines_KVAR_power, lname):
         """
@@ -281,9 +280,10 @@ class DSS_Data:
 
         return Pjk, Qjk, pjk, qjk
 
-    #TODO: Change PyDSS interface calls to OpenDSSDirect.
-    def __get_line_powers(self):
+    #TODO: Verify accuracy of changes in  PyDSS interface calls to OpenDSSDirect.
+    def __get_circuit_line_flows(self):
         """
+        Get the line flows for all elements in the circuit.
         @author: Jorge Fernandez and Samuel Talkington
         """
         # prelocate 
@@ -291,26 +291,26 @@ class DSS_Data:
         lines_KW_dict = dict()
         lines_KVAR_dict = dict()
         # dss elements
-        elements = self.dss.circuit_all_element_names()
+        elements = self.dss.Circuit.AllElementNames()
         for i, elem in enumerate(elements):
-            self.dss.circuit_set_active_element(elem)
+            self.dss.Circuit.SetActiveElement(elem)
             if "Line" in elem:
                 lines.append(elem)
-                lines_KW_dict[elem] = self.dss.cktelement_powers()[0::2]
-                lines_KVAR_dict[elem] = self.dss.cktelement_powers()[1::2]
+                lines_KW_dict[elem] = self.dss.CktElement.Powers()[0::2]
+                lines_KVAR_dict[elem] = self.dss.CktElement.Powers()[1::2]
 
             elif "Transformer" in elem:
                 lines.append(elem)
                 if elem == 'Transformer.xfm1':
-                    lines_KW_dict[elem] = self.dss.cktelement_powers()[0::2]
-                    lines_KVAR_dict[elem] = self.dss.cktelement_powers()[1::2]
+                    lines_KW_dict[elem] = self.dss.CktElement.Powers()[0::2]
+                    lines_KVAR_dict[elem] = self.dss.CktElement.Powers()[1::2]
                     del lines_KW_dict[elem][3]
                     del lines_KW_dict[elem][-1]
                     del lines_KVAR_dict[elem][3]
                     del lines_KVAR_dict[elem][-1]
                 else: 
-                    lines_KW_dict[elem] = [i for i in self.dss.cktelement_powers()[0::2] if i != 0]
-                    lines_KVAR_dict[elem] = [i for i in self.dss.cktelement_powers()[1::2] if i != 0]
+                    lines_KW_dict[elem] = [i for i in self.dss.CktElement.Powers()[0::2] if i != 0]
+                    lines_KVAR_dict[elem] = [i for i in self.dss.CktElement.Powers()[1::2] if i != 0]
         return lines, lines_KW_dict, lines_KVAR_dict
 
     def __initialize_dss(self):
