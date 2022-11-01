@@ -149,8 +149,8 @@ New Transformer.Trafo11 phases=1 wdg=1 bus=BusPrim11.2 kV=7.199557856794634 kVA=
 New Line.LineSec11_1 bus1=BusTrafo11LV.2 bus2=BusSec11_1.2 linecode=Triplex1PhEquivalent4 length=122 units=ft 
 New Line.LineSec11_2 bus1=BusTrafo11LV.2 bus2=BusSec11_2.2 linecode=Triplex1PhEquivalent4 length=167 units=ft
 ! Loads without loadshapes
-New Load.Load11_1 kV=0.24 phases=1 bus1=BusSec11_1.2 model=1 conn=wye kW=10 kvar=2 Vminpu=0.6 Vmaxpu=2.0 duty=Load1_2
-New Load.Load11_2 kV=0.24 phases=1 bus1=BusSec11_2.2 model=1 conn=wye kW=12 kvar=4 Vminpu=0.6 Vmaxpu=2.0 duty=Load1_1
+New Load.Load11_1 kV=0.24 phases=1 bus1=BusSec11_1.2 model=1 conn=wye kW=10 kvar=2 Vminpu=0.6 Vmaxpu=2.0 duty=Load11_1
+New Load.Load11_2 kV=0.24 phases=1 bus1=BusSec11_2.2 model=1 conn=wye kW=12 kvar=4 Vminpu=0.6 Vmaxpu=2.0 duty=Load11_2
 
 
 ! Secondary circuit 12: 1-phase equivalent of the split-phase transformer with percent short-circuit impedance: r+jx=1.18+j1.44
@@ -172,24 +172,11 @@ New Line.TriplexLoad7 bus1=BusLV5.1 bus2=BusLoad7.1 length=42 units=ft linecode=
 New Line.TriplexLoad8 bus1=BusLV5.1 bus2=BusLoad8.1 length=23 units=ft linecode=Triplex1PhEquivalent4/0
 
 ! Loads without loadshapes, kvar calculated from pf=0.854
-New Load.Load12_1 kV=0.24 phases=1 bus1=BusLoad1.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=1.6 kvar=1.0 duty=Load1_3
-New Load.Load12_2 kV=0.24 phases=1 bus1=BusLoad2.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=1.2 kvar=0.7 duty=Load1_4
-New Load.Load12_3 kV=0.24 phases=1 bus1=BusLoad3.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=5.2 kvar=3.2 duty=Load1_5
-New Load.Load12_4 kV=0.24 phases=1 bus1=BusLoad4.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=8.3 kvar=5.1 duty=Load3_1
-New Load.Load12_5 kV=0.24 phases=1 bus1=BusLoad5.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=2.6 kvar=1.6 duty=Load3_2
-New Load.Load12_6 kV=0.24 phases=1 bus1=BusLoad6.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=8.4 kvar=5.1 duty=Load3_3
-New Load.Load12_7 kV=0.24 phases=1 bus1=BusLoad7.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=1.8 kvar=1.1 duty=Load4_1
-New Load.Load12_8 kV=0.24 phases=1 bus1=BusLoad8.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=5.7 kvar=3.5 duty=Load4_2
-
-
-
-
-
-
-
-
-
-
-
-
-
+New Load.Load12_1 kV=0.24 phases=1 bus1=BusLoad1.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=1.6 kvar=1.0 duty=Load12_1
+New Load.Load12_2 kV=0.24 phases=1 bus1=BusLoad2.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=1.2 kvar=0.7 duty=Load12_2
+New Load.Load12_3 kV=0.24 phases=1 bus1=BusLoad3.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=5.2 kvar=3.2 duty=Load12_3
+New Load.Load12_4 kV=0.24 phases=1 bus1=BusLoad4.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=8.3 kvar=5.1 duty=Load12_4
+New Load.Load12_5 kV=0.24 phases=1 bus1=BusLoad5.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=2.6 kvar=1.6 duty=Load12_5
+New Load.Load12_6 kV=0.24 phases=1 bus1=BusLoad6.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=8.4 kvar=5.1 duty=Load12_6
+New Load.Load12_7 kV=0.24 phases=1 bus1=BusLoad7.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=1.8 kvar=1.1 duty=Load12_7
+New Load.Load12_8 kV=0.24 phases=1 bus1=BusLoad8.1 Vminpu=0.6 Vmaxpu=2.0 model=1 conn=wye kW=5.7 kvar=3.5 duty=Load12_8

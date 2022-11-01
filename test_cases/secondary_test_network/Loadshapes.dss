@@ -34,3 +34,13 @@ New Loadshape.load9_1 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load9_1_P.db
 New Loadshape.load9_2 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load9_2_P.dbl],  Qmult=[dblfile=Profiles/load9_2_Q.dbl] UseActual=yes
 New Loadshape.load10_1 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load10_1_P.dbl],  Qmult=[dblfile=Profiles/load10_1_Q.dbl] UseActual=yes
 New Loadshape.load10_2 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load10_2_P.dbl],  Qmult=[dblfile=Profiles/load10_2_Q.dbl] UseActual=yes
+New Loadshape.load11_1 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load11_1_P.dbl],  Qmult=[dblfile=Profiles/load11_1_Q.dbl] UseActual=yes
+New Loadshape.load11_2 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load11_2_P.dbl],  Qmult=[dblfile=Profiles/load11_2_Q.dbl] UseActual=yes
+New Loadshape.load12_1 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_1_P.dbl],  Qmult=[dblfile=Profiles/load12_1_Q.dbl] UseActual=yes
+New Loadshape.load12_2 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_2_P.dbl],  Qmult=[dblfile=Profiles/load12_2_Q.dbl] UseActual=yes
+New Loadshape.load12_3 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_3_P.dbl],  Qmult=[dblfile=Profiles/load12_3_Q.dbl] UseActual=yes
+New Loadshape.load12_4 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_4_P.dbl],  Qmult=[dblfile=Profiles/load12_4_Q.dbl] UseActual=yes
+New Loadshape.load12_5 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_5_P.dbl],  Qmult=[dblfile=Profiles/load12_5_Q.dbl] UseActual=yes
+New Loadshape.load12_6 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_6_P.dbl],  Qmult=[dblfile=Profiles/load12_6_Q.dbl] UseActual=yes
+New Loadshape.load12_7 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_7_P.dbl],  Qmult=[dblfile=Profiles/load12_7_Q.dbl] UseActual=yes
+New Loadshape.load12_8 Npts=8739 mInterval=60 mult=[dblfile=Profiles/load12_8_P.dbl],  Qmult=[dblfile=Profiles/load12_8_Q.dbl] UseActual=yes
