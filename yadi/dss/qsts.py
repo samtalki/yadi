@@ -67,7 +67,7 @@ class DSS_Timeseries(model.DSS_Data):
             self.__run_qsts_duty(nodes,n_nodes)
         
         nodal_mvts_dfs = dict()
-        dt_index = pd.date_range(start='1/1/2020',periods=self.simulation_steps,freq='1H')
+        dt_index = pd.date_range(start='1/1/2019',periods=self.simulation_steps,freq='1H')
         
         for i,node in enumerate(nodes):
             D_i = pd.DataFrame(index = dt_index,columns=['netloadV','netloadP','netloadQ'])
@@ -284,28 +284,28 @@ class DSS_Timeseries(model.DSS_Data):
         ---
             month: {01-jan, 02-feb, ....}
         """
-        self.daysInThisMonth = monthrange(2020, int(month))
+        self.daysInThisMonth = monthrange(2019, int(month))
         self.scriptPath = scriptPath
         self.monthlyDemand_dir = pathlib.Path(self.scriptPath).joinpath("outputs", "MonthlyDemand")
         if not os.path.isdir(self.monthlyDemand_dir):
             os.mkdir(self.monthlyDemand_dir)
         # load residential demand
-        loadShapes = self.__load_LoadShapePerMonth(month)
+        kwLoadShapes, kvarLoadShapes = self.__load_LoadShapePerMonth(month)
         # set monthly loadShapes
-        self.__setAllLoadShapes(loadShapes)
+        self.__setAllLoadShapes(kwLoadShapes, kvarLoadShapes)
         # run routine with modified loadShapes
         self.__run_qsts_OpenDSS_duty()
 
-    def __setAllLoadShapes(self, loadShapes):
+    def __setAllLoadShapes(self, kwLoadShapes, kvarLoadShapes):
         "Method to modify loadShapes from a DSS file"
         loadShapeNames = self.dss.LoadShape.AllNames()
         for n, loadShapeName in enumerate(loadShapeNames):
             if loadShapeName == 'default':
                 continue
             # extract profiles
-            Pmult = list(loadShapes.loc[:, loadShapeName + "_Pmult"].values)
-            if loadShapeName + "_Qmult" in loadShapes.columns:
-                Qmult = list(loadShapes.loc[:, loadShapeName + "_Qmult"].values)
+            Pmult = list(kwLoadShapes.loc[:, loadShapeName].values)
+            if loadShapeName in kvarLoadShapes.columns:
+                Qmult = list(kvarLoadShapes.loc[:, loadShapeName].values)
             else:
                 Qmult = None
 
@@ -328,7 +328,8 @@ class DSS_Timeseries(model.DSS_Data):
     def __extract_loadShapes(self):
         """extract loadshapes from dss file"""
         loadShapeNames = self.dss.LoadShape.AllNames()
-        loadShape_dict = dict()
+        kwLoadShape_dict = dict()
+        kvarLoadShape_dict = dict()
         for n, loadShapeName in enumerate(loadShapeNames):
             if loadShapeName == 'default':
                 continue
@@ -340,46 +341,60 @@ class DSS_Timeseries(model.DSS_Data):
             Qmult = self.dss.LoadShape.QMult()
             # Pmult_len = len(Pmult)
             if len(Pmult) != 1:
-                loadShape_dict[loadShapeName + "_Pmult"] = np.asarray(Pmult)
+                kwLoadShape_dict[loadShapeName] = np.asarray(Pmult)
             if len(Qmult) != 1:
-                loadShape_dict[loadShapeName + "_Qmult"] = np.asarray(Qmult)
-        loadShapes = pd.DataFrame().from_dict(loadShape_dict)
-        return loadShapes
+                kvarLoadShape_dict[loadShapeName] = np.asarray(Qmult)
+        kwLoadShapes = pd.DataFrame().from_dict(kwLoadShape_dict)
+        kvarLoadShapes = pd.DataFrame().from_dict(kvarLoadShape_dict)
+        return (kwLoadShapes, kvarLoadShapes)
 
     def __split_loadShapes(self, loadShapes):
         """split loadshapes by months"""
+        kwLoadShapes = loadShapes[0]
+        kvarLoadShapes = loadShapes[1]
         skipRows = 0
         monthsForIter = ["01", "02", "03", "04", "05", "06",
                          "07", "08", "09", "10", "11", "12"]
         for it, monthIter in enumerate(monthsForIter):
-            daysInMonth = monthrange(2020, int(monthIter))
-            hoursInMonth = 24 * self.daysInMonth[1]  # number of hours in month
+            daysInMonth = monthrange(2019, int(monthIter))
+            hoursInMonth = 24 * daysInMonth[1]  # number of hours in month
             # define the name of the monthly demand file
-            monthlyDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{monthIter}_profile.pkl")
-            if not os.path.isfile(monthlyDemand_path):
-                dfDemand = loadShapes.iloc[skipRows:hoursInMonth, :]
-                # create index date range
+            kwDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{monthIter}_kwProfile.pkl")
+            kvarDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{monthIter}_kvarProfile.pkl")
+            if not os.path.isfile(kwDemand_path):
                 if monthIter == "12":
-                    time = pd.date_range(start=f"2020-{monthIter}-01", end="2021-01-01", freq="H")
+                    kwDemand = kwLoadShapes.iloc[skipRows:, :]
+                    kvarDemand = kvarLoadShapes.iloc[skipRows:, :]
+                    # create index date range
+                    time = pd.date_range(start=f"2019-{monthIter}-01", end="2020-01-01", freq="H")
                 else:
-                    time = pd.date_range(start=f"2020-{monthIter}-01", end=f"2020-{monthsForIter[it + 1]}-01", freq="H")
+                    kwDemand = kwLoadShapes.iloc[skipRows:skipRows + hoursInMonth, :]
+                    kvarDemand = kvarLoadShapes.iloc[skipRows:skipRows + hoursInMonth, :]
+                    # create index date range
+                    time = pd.date_range(start=f"2019-{monthIter}-01", end=f"2019-{monthsForIter[it + 1]}-01", freq="H")
                 # transform string index into datetime index
-                dfDemand.index = pd.to_datetime(time[:-1])
+                kwDemand.index = pd.to_datetime(time[:len(kwDemand)])
+                kvarDemand.index = pd.to_datetime(time[:len(kvarDemand)])
                 # call method for processing series
-                dfDemand.to_pickle(monthlyDemand_path)
+                kwDemand.to_pickle(kwDemand_path)
+                kvarDemand.to_pickle(kvarDemand_path)
+                skipRows += hoursInMonth
             else:
                 skipRows += hoursInMonth
 
     def __load_LoadShapePerMonth(self, month):
         """load demand per month"""
         # extract demand
-        monthlyDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{month}_profile.pkl")
-        if not os.path.isfile(monthlyDemand_path):
+        kwDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{month}_kwProfile.pkl")
+        kvarDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{month}_kvarProfile.pkl")
+        if not os.path.isfile(kwDemand_path):
             self.__split_loadShapes(self.__extract_loadShapes())
-        dfDemand = pd.read_pickle(monthlyDemand_path)
-        self.simulation_steps = len(dfDemand)
-        self.demand = dfDemand
-        return dfDemand
+        kwDemand = pd.read_pickle(kwDemand_path)
+        kvarDemand = pd.read_pickle(kvarDemand_path)
+        self.simulation_steps = len(kwDemand)
+        self.kwDemand = kwDemand
+        self.kvarDemand = kvarDemand
+        return kwDemand, kvarDemand
 
     def __set_monitor(self, element_name, element_type, mon_name_prefix, power=True, voltage=True, verbose=False):
         """Sets a monitor on element_name of element_type"""
@@ -435,11 +450,11 @@ class DSS_Timeseries(model.DSS_Data):
             kw_dict[load_name] = kws
             kvar_dict[load_name] = kvars
         voltage_profiles = pd.DataFrame.from_dict(voltage_dict)
-        voltage_profiles = voltage_profiles.set_index(self.demand.index)
+        voltage_profiles = voltage_profiles.set_index(self.kwDemand.index)
         kw_profiles = pd.DataFrame.from_dict(kw_dict)
-        kw_profiles = kw_profiles.set_index(self.demand.index)
+        kw_profiles = kw_profiles.set_index(self.kwDemand.index)
         kvar_profiles = pd.DataFrame.from_dict(kvar_dict)
-        kvar_profiles = kvar_profiles.set_index(self.demand.index)
+        kvar_profiles = kvar_profiles.set_index(self.kwDemand.index)
         return voltage_profiles, kw_profiles, kvar_profiles
 
     def __get_monitor_timeseries(self, element_name, element_type="Load"):
