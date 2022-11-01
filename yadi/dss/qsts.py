@@ -8,7 +8,7 @@ October 6th, 2021
 
 import numpy as np
 import pandas as pd
-import yadi.dss.model as model 
+import yadi.yadi.dss.model as model 
 import warnings
 from tqdm import tqdm
 import pathlib
@@ -233,6 +233,22 @@ class DSS_Timeseries(model.DSS_Data):
     #  ######### native Opendss - monthly QSTS #########
     #  #################################################
 
+    def get_loadBus(self):
+        "Method to extract load buses from a feeder"
+        loadBusDict = dict()
+        elems = self.dss.Circuit.AllElementNames()
+        for elem in elems:
+            self.dss.Circuit.SetActiveElement(elem)
+            if "Load" in elem:
+                # extract load name
+                loadName = elem.split(".")[1]
+                # get bus name
+                buses = self.dss.CktElement.BusNames()
+                bus = buses[0]
+                # save name
+                loadBusDict[loadName] = bus
+        return pd.Series(loadBusDict)
+
     def initialize_qsts_duty(self, monitor_loads=True, verbose=False):
         """
         Initialize a duty-mode Quasi-Static Time Series simulation.
@@ -268,8 +284,9 @@ class DSS_Timeseries(model.DSS_Data):
         ---
             month: {01-jan, 02-feb, ....}
         """
+        self.daysInThisMonth = monthrange(2020, int(month))
         self.scriptPath = scriptPath
-        self.monthlyDemand_dir = pathlib.Path(self.scriptPath).joinpath("test_cases", "secondary_test_network", "Profiles", "MonthlyDemand")
+        self.monthlyDemand_dir = pathlib.Path(self.scriptPath).joinpath("outputs", "MonthlyDemand")
         if not os.path.isdir(self.monthlyDemand_dir):
             os.mkdir(self.monthlyDemand_dir)
         # load residential demand
@@ -336,7 +353,7 @@ class DSS_Timeseries(model.DSS_Data):
                          "07", "08", "09", "10", "11", "12"]
         for it, monthIter in enumerate(monthsForIter):
             daysInMonth = monthrange(2020, int(monthIter))
-            hoursInMonth = 24 * daysInMonth[1]  # number of hours in month
+            hoursInMonth = 24 * self.daysInMonth[1]  # number of hours in month
             # define the name of the monthly demand file
             monthlyDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{monthIter}_profile.pkl")
             if not os.path.isfile(monthlyDemand_path):
@@ -414,7 +431,7 @@ class DSS_Timeseries(model.DSS_Data):
         kvar_dict = dict()
         for n, load_name in enumerate(loads):
             volts, kws, kvars = self.__get_monitor_timeseries(element_name=load_name)
-            voltage_dict[load_name + "voltage"] = volts
+            voltage_dict[load_name] = volts
             kw_dict[load_name] = kws
             kvar_dict[load_name] = kvars
         voltage_profiles = pd.DataFrame.from_dict(voltage_dict)
@@ -454,3 +471,4 @@ class DSS_Timeseries(model.DSS_Data):
         self.dss.Monitors.Name(monitor_name)
         power_matrix = self.dss.Monitors.AsMatrix()  # N timesteps x M chanels (t, 0, P1, Q1, ....)
         return power_matrix[:, 2], power_matrix[:, 3]
+
