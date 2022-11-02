@@ -145,30 +145,6 @@ class DSS_Timeseries(model.DSS_Data):
         }
         return D_diff_N
 
-    def get_monitor_timeseries(self,element_name,element_type="Load"):
-        """
-        Gets the voltage, active, and reactive power timeseries dictionary for a single elemented in the system: 
-        D_i = {(V_i,t,P_i,t,Q_i,t)}_{t=1,..,M}
-
-        Parameters:
-        ---
-            dss: the dss object
-            element: name of the lement
-        """
-        #simulation_steps = int(60*60*24 / time_step) #Number of simulation steps in seconds
-        #set_monitor(inj_node) #Setup the real and reactive power node monitor
-        #initialize_qsts(dss,time_step,simulation_steps) #QSTS actions..
-        #run_qsts_year(dss)
-        
-        voltage_ts = self.__export_monitor_voltage(element_name)
-        power_ts = self.__export_monitor_power(element_name)    
-
-        D = {
-            'voltage_ts':voltage_ts,
-            'power_ts':power_ts
-        }
-        return D
-
 
     def get_voltages_static(self):
         """Gets the static voltages for all buses"""
@@ -293,7 +269,7 @@ class DSS_Timeseries(model.DSS_Data):
         print('QSTS Initialized, Returned: ', [err for err in errs])
         self.__qsts_initialized = True
 
-    def run_yearly(self):
+    def run_yearly(self, userDemand=None):
         """
         Compute monthly voltage, active, and reactive power timeseries dictionary for a single node i in the system:
         D_i = {(V_i,t,P_i,t,Q_i,t)}_{t=1,..,M} for all i
@@ -302,6 +278,8 @@ class DSS_Timeseries(model.DSS_Data):
         ---
             month: {01-jan, 02-feb, ....}
         """
+        if userDemand is not None:
+            self.__setAllLoadShapes(userDemand[0], userDemand[1])
         # run routine with modified loadShapes
         self.__run_qsts_OpenDSS_duty()
 
@@ -316,7 +294,7 @@ class DSS_Timeseries(model.DSS_Data):
         """
         self.daysInThisMonth = monthrange(2019, int(month))
         self.scriptPath = scriptPath
-        self.monthlyDemand_dir = pathlib.Path(self.scriptPath).joinpath("outputs", "MonthlyDemand")
+        self.monthlyDemand_dir = pathlib.Path(self.scriptPath).joinpath("outputs", "monthlyDemand")
         if not os.path.isdir(self.monthlyDemand_dir):
             os.mkdir(self.monthlyDemand_dir)
         # load residential demand
@@ -333,14 +311,22 @@ class DSS_Timeseries(model.DSS_Data):
             if loadShapeName == 'default':
                 continue
             # extract profiles
-            Pmult = list(kwLoadShapes.loc[:, loadShapeName].values)
+            if loadShapeName in kwLoadShapes.columns:
+                Pmult = list(kwLoadShapes.loc[:, loadShapeName].values)
+            else:
+                Pmult = None
             if loadShapeName in kvarLoadShapes.columns:
                 Qmult = list(kvarLoadShapes.loc[:, loadShapeName].values)
             else:
                 Qmult = None
 
-            if Qmult is not None:
+            if (Qmult is not None) and (Pmult is not None):
                 self.__modifyLoadShapePQ(Pmult, Qmult, loadShapeName)
+            elif kwLoadShapes.shape[1] == kvarLoadShapes.shape[1]:
+                self.dss.LoadShape.Name(loadShapeName)
+                offset = 3
+                Pmult = self.dss.LoadShape.PMult()
+                self.__modifyLoadShapeP(Pmult[offset:], loadShapeName)
             else:
                 self.__modifyLoadShapeP(Pmult, loadShapeName)
 
@@ -459,6 +445,7 @@ class DSS_Timeseries(model.DSS_Data):
         self.loadVolts = voltage_profiles
         self.loadKws = kw_profiles
         self.loadKvars = kvar_profiles
+        self.lineIjks = Ijk
         self.linePjks = Pjk
         self.lineQjk = Qjk
 
@@ -487,7 +474,7 @@ class DSS_Timeseries(model.DSS_Data):
         Pjk_dict = dict()
         Qjk_dict = dict()
         for n, line_name in enumerate(lines):
-            Ijk, Pjk, Qjk = self.__get_monitor_timeseries(element_name=line_name, element_type="Line")
+            Ijk, Pjk, Qjk = self.__get_monitor_timeseries(name=line_name, type="Line")
             if (Ijk.shape[1] > 1) and (Pjk.shape[1] > 1) and (Qjk.shape[1] > 1):
                 self.dss.Lines.Name(line_name)  # set current line as active
                 phases = self.dss.Lines.Phases()
@@ -521,7 +508,7 @@ class DSS_Timeseries(model.DSS_Data):
         kw_dict = dict()
         kvar_dict = dict()
         for n, load_name in enumerate(loads):
-            volts, kws, kvars = self.__get_monitor_timeseries(element_name=load_name)
+            volts, kws, kvars = self.__get_monitor_timeseries(load_name)
             voltage_dict[load_name] = volts
             kw_dict[load_name] = kws
             kvar_dict[load_name] = kvars
@@ -540,7 +527,7 @@ class DSS_Timeseries(model.DSS_Data):
         kvar_profiles = kvar_profiles.set_index(dt_index)
         return voltage_profiles, kw_profiles, kvar_profiles
 
-    def __get_monitor_timeseries(self, element_name, element_type="Load"):
+    def __get_monitor_timeseries(self, name, type="Load"):
         """
         Gets the voltage, active, and reactive power timeseries dictionary for a single elemented in the system:
         {(V_i,t,P_i,t,Q_i)_t}_{t=1,..,M}
@@ -550,13 +537,13 @@ class DSS_Timeseries(model.DSS_Data):
             dss: the dss object
             element: name of the lement
         """
-        if element_type == "Line":
-            Ijk_ts = self.__export_monitor_voltage(element_name, element_type)
-            Pjk_ts, Qjk_ts = self.__export_monitor_power(element_name, element_type)
+        if type == "Line":
+            Ijk_ts = self.__export_monitor_voltage(name, type)
+            Pjk_ts, Qjk_ts = self.__export_monitor_power(name, type)
             return Ijk_ts, Pjk_ts, Qjk_ts
         else:
-            voltage_ts = self.__export_monitor_voltage(element_name)
-            kw_ts, kvar_ts = self.__export_monitor_power(element_name, element_type)
+            voltage_ts = self.__export_monitor_voltage(name, type)
+            kw_ts, kvar_ts = self.__export_monitor_power(name, type)
             return voltage_ts, kw_ts, kvar_ts
 
     def __export_monitor_voltage(self, name, type):
@@ -568,7 +555,12 @@ class DSS_Timeseries(model.DSS_Data):
         if type == "Load":
             return voltage_matrix[:, 2]  # interested in v1 for loads
         elif type == "Line":
-            return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
+            self.dss.Lines.Name(name)  # set current line as active
+            phases = self.dss.Lines.Phases()
+            if phases == 1:
+                return voltage_matrix[:, 4::2]  # interested in current magnitudes for the lines
+            if phases == 3:
+                return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
         
 
     def __export_monitor_power(self, name, type):
