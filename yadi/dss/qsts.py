@@ -6,6 +6,7 @@ October 6th, 2021
 
 """
 
+from tkinter import W
 import numpy as np
 import pandas as pd
 import yadi.yadi.dss.model as model 
@@ -67,7 +68,7 @@ class DSS_Timeseries(model.DSS_Data):
             self.__run_qsts_duty(nodes,n_nodes)
         
         nodal_mvts_dfs = dict()
-        dt_index = pd.date_range(start='1/1/2019',periods=self.simulation_steps,freq='1H')
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps, freq='1H')
         
         for i,node in enumerate(nodes):
             D_i = pd.DataFrame(index = dt_index,columns=['netloadV','netloadP','netloadQ'])
@@ -233,9 +234,10 @@ class DSS_Timeseries(model.DSS_Data):
     #  ######### native Opendss - monthly QSTS #########
     #  #################################################
 
-    def get_loadBus(self):
+    def get_loadBusAndVln(self):
         "Method to extract load buses from a feeder"
         loadBusDict = dict()
+        loadVlnDict = dict()
         elems = self.dss.Circuit.AllElementNames()
         for elem in elems:
             self.dss.Circuit.SetActiveElement(elem)
@@ -247,9 +249,21 @@ class DSS_Timeseries(model.DSS_Data):
                 bus = buses[0]
                 # save name
                 loadBusDict[loadName] = bus
-        return pd.Series(loadBusDict)
+                # extract load line-to-neutral voltage
+                self.dss.Loads.Name(loadName)
+                loadVlnDict[loadName] = self.dss.Loads.kV()
+        return pd.Series(loadBusDict), pd.Series(loadVlnDict)
 
-    def initialize_qsts_duty(self, monitor_loads=True, verbose=False):
+    def get_lineEAmps(self):
+        "Method to extract line emergency amps"
+        lines = self.dss.Lines.AllNames()
+        thermalLimitDict = dict()
+        for line in lines:
+            self.dss.Lines.Name(line)
+            thermalLimitDict[line] = self.dss.Lines.EmergAmps()
+        return pd.series(thermalLimitDict)
+
+    def initialize_qsts_duty(self, monitor_lines=True, monitor_loads=True, verbose=False):
         """
         Initialize a duty-mode Quasi-Static Time Series simulation.
 
@@ -261,6 +275,10 @@ class DSS_Timeseries(model.DSS_Data):
 
         if(monitor_loads):
             self.__set_monitor_all_loads(verbose=verbose)
+
+        if(monitor_lines):
+            self.__set_monitor_all_lines(verbose=verbose)
+
         errs.append(
             self.dss.run_command('Set controlmode=static')
         )
@@ -274,6 +292,18 @@ class DSS_Timeseries(model.DSS_Data):
         )
         print('QSTS Initialized, Returned: ', [err for err in errs])
         self.__qsts_initialized = True
+
+    def run_yearly(self):
+        """
+        Compute monthly voltage, active, and reactive power timeseries dictionary for a single node i in the system:
+        D_i = {(V_i,t,P_i,t,Q_i,t)}_{t=1,..,M} for all i
+
+        Parameters:
+        ---
+            month: {01-jan, 02-feb, ....}
+        """
+        # run routine with modified loadShapes
+        self.__run_qsts_OpenDSS_duty()
 
     def run_monthly(self, scriptPath, month):
         """
@@ -402,7 +432,7 @@ class DSS_Timeseries(model.DSS_Data):
             mon_name = mon_name_prefix + "power"
             err1 = self.dss.run_command(f"New Monitor.{mon_name} "
                                         f"Element={element_type}.{element_name} "
-                                        f"terminal=1 PPolar=no mode=1")
+                                        "terminal=1 PPolar=no mode=1")
             if(verbose):
                 print("Monitor type: ", mon_name_prefix + "power", " placed on", element_type, " name: ", element_name, "with errors: ", err1)
 
@@ -410,7 +440,7 @@ class DSS_Timeseries(model.DSS_Data):
             mon_name = mon_name_prefix + "voltage"
             err2 = self.dss.run_command(f"New Monitor.{mon_name} "
                                         f"Element={element_type}.{element_name} "
-                                        f"terminal=1 vipolar=yes mode=0")
+                                        "terminal=1 vipolar=yes mode=0")
             if(verbose):
                 print("Monitor type: ", mon_name_prefix + "voltage", " placed on", element_type, " name: ", element_name, "with errors: ", err2)
 
@@ -424,10 +454,22 @@ class DSS_Timeseries(model.DSS_Data):
         # whole duty
         self.dss.run_command('solve')
         voltage_profiles, kw_profiles, kvar_profiles = self.__get_monitor_all_loads()
+        Ijk, Pjk, Qjk = self.__get_monitor_all_lines()
         self.__qsts_complete = True
         self.loadVolts = voltage_profiles
         self.loadKws = kw_profiles
         self.loadKvars = kvar_profiles
+        self.linePjks = Pjk
+        self.lineQjk = Qjk
+
+    def __set_monitor_all_lines(self, verbose=False):
+        """Sets timeseries power monitors on all lines before solving"""
+        lines = self.dss.Lines.AllNames()
+        for n, line_name in enumerate(lines):
+            mon_name_prefix = "mon_" + str(line_name) + "_"
+            self.__set_monitor(element_name=line_name, element_type="Line",
+                               mon_name_prefix=mon_name_prefix, power=True,
+                               voltage=True, verbose=verbose)
 
     def __set_monitor_all_loads(self, verbose=False):
         """Sets timeseries power monitors on all loads before solving"""
@@ -437,6 +479,40 @@ class DSS_Timeseries(model.DSS_Data):
             self.__set_monitor(element_name=load_name, element_type="Load",
                                mon_name_prefix=mon_name_prefix, power=True,
                                voltage=True, verbose=verbose)
+
+    def __get_monitor_all_lines(self, verbose=False):
+        """Sets timeseries power monitors on all loads before solving"""
+        lines = self.dss.Lines.AllNames()
+        Ijk_dict = dict()
+        Pjk_dict = dict()
+        Qjk_dict = dict()
+        for n, line_name in enumerate(lines):
+            Ijk, Pjk, Qjk = self.__get_monitor_timeseries(element_name=line_name, element_type="Line")
+            if (Ijk.shape[1] > 1) and (Pjk.shape[1] > 1) and (Qjk.shape[1] > 1):
+                self.dss.Lines.Name(line_name)  # set current line as active
+                phases = self.dss.Lines.Phases()
+                for ph in range(phases):
+                    Ijk_dict[line_name + f".{ph + 1}"] = Ijk[:, ph]
+                    Pjk_dict[line_name + f".{ph + 1}"] = Pjk[:, ph]
+                    Qjk_dict[line_name + f".{ph + 1}"] = Qjk[:, ph]
+            else:
+                Ijk_dict[line_name] = Ijk[:, 0]
+                Pjk_dict[line_name] = Pjk[:, 0]
+                Qjk_dict[line_name] = Qjk[:, 0]
+        
+        offset = 3
+        Ijk_profiles = pd.DataFrame.from_dict(Ijk_dict)
+        Ijk_profiles = Ijk_profiles[offset:]
+        Pjk_profiles = pd.DataFrame.from_dict(Pjk_dict)
+        Pjk_profiles = Pjk_profiles[offset:]
+        Qjk_profiles = pd.DataFrame.from_dict(Qjk_dict)
+        Qjk_profiles = Qjk_profiles[offset:]
+
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - offset, freq='H')
+        Ijk_profiles = Ijk_profiles.set_index(dt_index)
+        Pjk_profiles = Pjk_profiles.set_index(dt_index)
+        Qjk_profiles = Qjk_profiles.set_index(dt_index)
+        return Ijk_profiles, Pjk_profiles, Qjk_profiles
 
     def __get_monitor_all_loads(self, verbose=False):
         """Sets timeseries power monitors on all loads before solving"""
@@ -449,12 +525,19 @@ class DSS_Timeseries(model.DSS_Data):
             voltage_dict[load_name] = volts
             kw_dict[load_name] = kws
             kvar_dict[load_name] = kvars
+        
+        offset = 3
         voltage_profiles = pd.DataFrame.from_dict(voltage_dict)
-        voltage_profiles = voltage_profiles.set_index(self.kwDemand.index)
+        voltage_profiles = voltage_profiles[offset:]
         kw_profiles = pd.DataFrame.from_dict(kw_dict)
-        kw_profiles = kw_profiles.set_index(self.kwDemand.index)
+        kw_profiles = kw_profiles[offset:]
         kvar_profiles = pd.DataFrame.from_dict(kvar_dict)
-        kvar_profiles = kvar_profiles.set_index(self.kwDemand.index)
+        kvar_profiles = kvar_profiles[offset:]
+
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - offset, freq='H')
+        voltage_profiles = voltage_profiles.set_index(dt_index)
+        kw_profiles = kw_profiles.set_index(dt_index)
+        kvar_profiles = kvar_profiles.set_index(dt_index)
         return voltage_profiles, kw_profiles, kvar_profiles
 
     def __get_monitor_timeseries(self, element_name, element_type="Load"):
@@ -467,23 +550,34 @@ class DSS_Timeseries(model.DSS_Data):
             dss: the dss object
             element: name of the lement
         """
-        voltage_ts = self.__export_monitor_voltage(element_name)
-        kw_ts, kvar_ts = self.__export_monitor_power(element_name)
-        return voltage_ts, kw_ts, kvar_ts
+        if element_type == "Line":
+            Ijk_ts = self.__export_monitor_voltage(element_name, element_type)
+            Pjk_ts, Qjk_ts = self.__export_monitor_power(element_name, element_type)
+            return Ijk_ts, Pjk_ts, Qjk_ts
+        else:
+            voltage_ts = self.__export_monitor_voltage(element_name)
+            kw_ts, kvar_ts = self.__export_monitor_power(element_name, element_type)
+            return voltage_ts, kw_ts, kvar_ts
 
-    def __export_monitor_voltage(self, element_name):
+    def __export_monitor_voltage(self, name, type):
         """Gets the voltage timeseries for an element that is monitored"""
-        monitor_name = "mon_" + element_name + "_voltage"
+        monitor_name = "mon_" + name + "_voltage"
         # set the active monitor according to name
         self.dss.Monitors.Name(monitor_name)
         voltage_matrix = self.dss.Monitors.AsMatrix()  # N timesteps x M chanels (t, 0, v1, angle 1, ... I1, angle1, ...)
-        return voltage_matrix[:, 2]  # interested in v1
+        if type == "Load":
+            return voltage_matrix[:, 2]  # interested in v1 for loads
+        elif type == "Line":
+            return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
+        
 
-    def __export_monitor_power(self, element_name):
+    def __export_monitor_power(self, name, type):
         """Gets the active and reactive power timeseries for an element monitored"""
-        monitor_name = "mon_" + element_name + "_power"
+        monitor_name = "mon_" + name + "_power"
         # set the active monitor according to name
         self.dss.Monitors.Name(monitor_name)
         power_matrix = self.dss.Monitors.AsMatrix()  # N timesteps x M chanels (t, 0, P1, Q1, ....)
-        return power_matrix[:, 2], power_matrix[:, 3]
-
+        if type == "Load":
+            return power_matrix[:, 2], power_matrix[:, 3]  # interesteed in P1, Q1 for loads
+        elif type == "Line":
+            return power_matrix[:, 2::2], power_matrix[:, 3::2]   # interesteed in Pjks and Qjks for the phases
