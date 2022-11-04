@@ -236,8 +236,8 @@ class DSS_Timeseries(model.DSS_Data):
         thermalLimitDict = dict()
         for line in lines:
             self.dss.Lines.Name(line)
-            thermalLimitDict[line] = self.dss.Lines.EmergAmps()
-        return pd.series(thermalLimitDict)
+            thermalLimitDict[line] = self.dss.Lines.NormAmps()
+        return pd.Series(thermalLimitDict)
 
     def initialize_qsts_duty(self, monitor_lines=True, monitor_loads=True, verbose=False):
         """
