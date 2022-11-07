@@ -283,6 +283,9 @@ class DSS_Timeseries(model.DSS_Data):
         """
         if userDemand is not None:
             self.__setAllLoadShapes(userDemand[0], userDemand[1])
+            self.offset = 0
+        else:
+            self.offset = 3  # the dss duty lenght is shifted!
         # run routine with modified loadShapes
         self.__run_qsts_OpenDSS_duty()
 
@@ -494,27 +497,26 @@ class DSS_Timeseries(model.DSS_Data):
         Qjk_dict = dict()
         for n, trafo_name in enumerate(trafos):
             Ijk, Pjk, Qjk = self.__get_monitor_timeseries(name=trafo_name, type="Transformer")
-            if (Ijk.shape[1] > 1) and (Pjk.shape[1] > 1) and (Qjk.shape[1] > 1):
+            if (len(Ijk.shape) > 1) and (len(Pjk.shape) > 1) and (len(Qjk.shape) > 1):
                 self.dss.Transformers.Name(trafo_name)  # set current trafo as active
-                phases = self.dss.Transformers.Phases()
+                phases = self.dss.CktElement.NumPhases()
                 for ph in range(phases):
                     Ijk_dict[trafo_name + f".{ph + 1}"] = Ijk[:, ph]
                     Pjk_dict[trafo_name + f".{ph + 1}"] = Pjk[:, ph]
                     Qjk_dict[trafo_name + f".{ph + 1}"] = Qjk[:, ph]
             else:
-                Ijk_dict[trafo_name] = Ijk[:, 0]
+                Ijk_dict[trafo_name] = Ijk
                 Pjk_dict[trafo_name] = Pjk[:, 0]
                 Qjk_dict[trafo_name] = Qjk[:, 0]
         
-        offset = 3
         Ijk_profiles = pd.DataFrame.from_dict(Ijk_dict)
-        Ijk_profiles = Ijk_profiles[offset:]
+        Ijk_profiles = Ijk_profiles[self.offset:]
         Pjk_profiles = pd.DataFrame.from_dict(Pjk_dict)
-        Pjk_profiles = Pjk_profiles[offset:]
+        Pjk_profiles = Pjk_profiles[self.offset:]
         Qjk_profiles = pd.DataFrame.from_dict(Qjk_dict)
-        Qjk_profiles = Qjk_profiles[offset:]
+        Qjk_profiles = Qjk_profiles[self.offset:]
 
-        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - offset, freq='H')
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - self.offset, freq='H')
         Ijk_profiles = Ijk_profiles.set_index(dt_index)
         Pjk_profiles = Pjk_profiles.set_index(dt_index)
         Qjk_profiles = Qjk_profiles.set_index(dt_index)
@@ -528,7 +530,7 @@ class DSS_Timeseries(model.DSS_Data):
         Qjk_dict = dict()
         for n, line_name in enumerate(lines):
             Ijk, Pjk, Qjk = self.__get_monitor_timeseries(name=line_name, type="Line")
-            if (Ijk.shape[1] > 1) and (Pjk.shape[1] > 1) and (Qjk.shape[1] > 1):
+            if (len(Ijk.shape) > 1) and (len(Pjk.shape) > 1) and (len(Qjk.shape) > 1):
                 self.dss.Lines.Name(line_name)  # set current line as active
                 phases = self.dss.Lines.Phases()
                 for ph in range(phases):
@@ -536,19 +538,18 @@ class DSS_Timeseries(model.DSS_Data):
                     Pjk_dict[line_name + f".{ph + 1}"] = Pjk[:, ph]
                     Qjk_dict[line_name + f".{ph + 1}"] = Qjk[:, ph]
             else:
-                Ijk_dict[line_name] = Ijk[:, 0]
+                Ijk_dict[line_name] = Ijk
                 Pjk_dict[line_name] = Pjk[:, 0]
                 Qjk_dict[line_name] = Qjk[:, 0]
         
-        offset = 3
         Ijk_profiles = pd.DataFrame.from_dict(Ijk_dict)
-        Ijk_profiles = Ijk_profiles[offset:]
+        Ijk_profiles = Ijk_profiles[self.offset:]
         Pjk_profiles = pd.DataFrame.from_dict(Pjk_dict)
-        Pjk_profiles = Pjk_profiles[offset:]
+        Pjk_profiles = Pjk_profiles[self.offset:]
         Qjk_profiles = pd.DataFrame.from_dict(Qjk_dict)
-        Qjk_profiles = Qjk_profiles[offset:]
+        Qjk_profiles = Qjk_profiles[self.offset:]
 
-        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - offset, freq='H')
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - self.offset, freq='H')
         Ijk_profiles = Ijk_profiles.set_index(dt_index)
         Pjk_profiles = Pjk_profiles.set_index(dt_index)
         Qjk_profiles = Qjk_profiles.set_index(dt_index)
@@ -566,15 +567,14 @@ class DSS_Timeseries(model.DSS_Data):
             kw_dict[load_name] = kws
             kvar_dict[load_name] = kvars
         
-        offset = 3
         voltage_profiles = pd.DataFrame.from_dict(voltage_dict)
-        voltage_profiles = voltage_profiles[offset:]
+        voltage_profiles = voltage_profiles[self.offset:]
         kw_profiles = pd.DataFrame.from_dict(kw_dict)
-        kw_profiles = kw_profiles[offset:]
+        kw_profiles = kw_profiles[self.offset:]
         kvar_profiles = pd.DataFrame.from_dict(kvar_dict)
-        kvar_profiles = kvar_profiles[offset:]
+        kvar_profiles = kvar_profiles[self.offset:]
 
-        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - offset, freq='H')
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - self.offset, freq='H')
         voltage_profiles = voltage_profiles.set_index(dt_index)
         kw_profiles = kw_profiles.set_index(dt_index)
         kvar_profiles = kvar_profiles.set_index(dt_index)
@@ -611,16 +611,25 @@ class DSS_Timeseries(model.DSS_Data):
             self.dss.Lines.Name(name)  # set current line as active
             phases = self.dss.Lines.Phases()
             if phases == 1:
-                return voltage_matrix[:, 4::2]  # interested in current magnitudes for the lines
+                numCols = voltage_matrix.shape[1]
+                # print(f"phase:{phases}-cols:{numCols}")
+                return voltage_matrix[:, 4]  # interested in current magnitudes for the lines
             if phases == 3:
+                numCols = voltage_matrix.shape[1]
+                # print(f"phase:{phases}-cols:{numCols}")
                 return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
         elif type == "Transformer":
             self.dss.Transformers.Name(name)  # set current line as active
-            phases = self.dss.Transformers.Phases()
+            # self.dss.Circuit.SetActiveElement(type + "." + name)
+            phases = self.dss.CktElement.NumPhases()
             if phases == 1:
-                return voltage_matrix[:, 4::2]  # interested in current magnitudes for the lines
+                numCols = voltage_matrix.shape[1]
+                # print(f"phase:{phases}-cols:{numCols}")
+                return voltage_matrix[:, 6]  # interested in current magnitudes for the lines
             if phases == 3:
-                return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
+                numCols = voltage_matrix.shape[1]
+                # print(f"phase:{phases}-cols:{numCols}")
+                return voltage_matrix[:, 10::2]  # interested in current magnitudes for the lines
         
 
     def __export_monitor_power(self, name, type):
@@ -632,4 +641,10 @@ class DSS_Timeseries(model.DSS_Data):
         if type == "Load":
             return power_matrix[:, 2], power_matrix[:, 3]  # interesteed in P1, Q1 for loads
         elif type == "Line":
+            numCols = power_matrix.shape[1]
+            # print(f"cols:{numCols}")
+            return power_matrix[:, 2::2], power_matrix[:, 3::2]   # interesteed in Pjks and Qjks for the phases
+        elif type == "Transformer":
+            numCols = power_matrix.shape[1]
+            # print(f"cols:{numCols}")
             return power_matrix[:, 2::2], power_matrix[:, 3::2]   # interesteed in Pjks and Qjks for the phases
