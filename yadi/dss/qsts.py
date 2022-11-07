@@ -239,7 +239,7 @@ class DSS_Timeseries(model.DSS_Data):
             thermalLimitDict[line] = self.dss.Lines.NormAmps()
         return pd.Series(thermalLimitDict)
 
-    def initialize_qsts_duty(self, monitor_lines=True, monitor_loads=True, verbose=False):
+    def initialize_qsts_duty(self, monitor_trafos=True, monitor_lines=True, monitor_loads=True, verbose=False):
         """
         Initialize a duty-mode Quasi-Static Time Series simulation.
 
@@ -254,6 +254,9 @@ class DSS_Timeseries(model.DSS_Data):
 
         if(monitor_lines):
             self.__set_monitor_all_lines(verbose=verbose)
+
+        if(monitor_lines):
+            self.__set_monitor_all_trafos(verbose=verbose)
 
         errs.append(
             self.dss.run_command('Set controlmode=static')
@@ -440,14 +443,21 @@ class DSS_Timeseries(model.DSS_Data):
         # whole duty
         self.dss.run_command('solve')
         voltage_profiles, kw_profiles, kvar_profiles = self.__get_monitor_all_loads()
-        Ijk, Pjk, Qjk = self.__get_monitor_all_lines()
+        lineIjk, linePjk, lineQjk = self.__get_monitor_all_lines()
+        trafoIjk, trafoPjk, trafoQjk = self.__get_monitor_all_trafos()
         self.__qsts_complete = True
+        # load quantities
         self.loadVolts = voltage_profiles
         self.loadKws = kw_profiles
         self.loadKvars = kvar_profiles
-        self.lineIjks = Ijk
-        self.linePjks = Pjk
-        self.lineQjk = Qjk
+        # line quantities
+        self.lineIjks = lineIjk
+        self.linePjks = linePjk
+        self.lineQjk = lineQjk
+        # trafo quantities
+        self.trafoIjks = trafoIjk
+        self.trafoPjks = trafoPjk
+        self.trafoQjk = trafoQjk
 
     def __set_monitor_all_lines(self, verbose=False):
         """Sets timeseries power monitors on all lines before solving"""
@@ -455,6 +465,15 @@ class DSS_Timeseries(model.DSS_Data):
         for n, line_name in enumerate(lines):
             mon_name_prefix = "mon_" + str(line_name) + "_"
             self.__set_monitor(element_name=line_name, element_type="Line",
+                               mon_name_prefix=mon_name_prefix, power=True,
+                               voltage=True, verbose=verbose)
+
+    def __set_monitor_all_trafos(self, verbose=False):
+        """Sets timeseries power monitors on all trafos before solving"""
+        trafos = self.dss.Transformers.AllNames()
+        for n, trafo_name in enumerate(trafos):
+            mon_name_prefix = "mon_" + str(trafo_name) + "_"
+            self.__set_monitor(element_name=trafo_name, element_type="Transformer",
                                mon_name_prefix=mon_name_prefix, power=True,
                                voltage=True, verbose=verbose)
 
@@ -466,6 +485,40 @@ class DSS_Timeseries(model.DSS_Data):
             self.__set_monitor(element_name=load_name, element_type="Load",
                                mon_name_prefix=mon_name_prefix, power=True,
                                voltage=True, verbose=verbose)
+
+    def __get_monitor_all_trafos(self, verbose=False):
+        """Sets timeseries power monitors on all loads before solving"""
+        trafos = self.dss.Transformers.AllNames()
+        Ijk_dict = dict()
+        Pjk_dict = dict()
+        Qjk_dict = dict()
+        for n, trafo_name in enumerate(trafos):
+            Ijk, Pjk, Qjk = self.__get_monitor_timeseries(name=trafo_name, type="Transformer")
+            if (Ijk.shape[1] > 1) and (Pjk.shape[1] > 1) and (Qjk.shape[1] > 1):
+                self.dss.Transformers.Name(trafo_name)  # set current trafo as active
+                phases = self.dss.Transformers.Phases()
+                for ph in range(phases):
+                    Ijk_dict[trafo_name + f".{ph + 1}"] = Ijk[:, ph]
+                    Pjk_dict[trafo_name + f".{ph + 1}"] = Pjk[:, ph]
+                    Qjk_dict[trafo_name + f".{ph + 1}"] = Qjk[:, ph]
+            else:
+                Ijk_dict[trafo_name] = Ijk[:, 0]
+                Pjk_dict[trafo_name] = Pjk[:, 0]
+                Qjk_dict[trafo_name] = Qjk[:, 0]
+        
+        offset = 3
+        Ijk_profiles = pd.DataFrame.from_dict(Ijk_dict)
+        Ijk_profiles = Ijk_profiles[offset:]
+        Pjk_profiles = pd.DataFrame.from_dict(Pjk_dict)
+        Pjk_profiles = Pjk_profiles[offset:]
+        Qjk_profiles = pd.DataFrame.from_dict(Qjk_dict)
+        Qjk_profiles = Qjk_profiles[offset:]
+
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - offset, freq='H')
+        Ijk_profiles = Ijk_profiles.set_index(dt_index)
+        Pjk_profiles = Pjk_profiles.set_index(dt_index)
+        Qjk_profiles = Qjk_profiles.set_index(dt_index)
+        return Ijk_profiles, Pjk_profiles, Qjk_profiles
 
     def __get_monitor_all_lines(self, verbose=False):
         """Sets timeseries power monitors on all loads before solving"""
@@ -537,7 +590,7 @@ class DSS_Timeseries(model.DSS_Data):
             dss: the dss object
             element: name of the lement
         """
-        if type == "Line":
+        if type == "Line" or type == "Transformer":
             Ijk_ts = self.__export_monitor_voltage(name, type)
             Pjk_ts, Qjk_ts = self.__export_monitor_power(name, type)
             return Ijk_ts, Pjk_ts, Qjk_ts
@@ -557,6 +610,13 @@ class DSS_Timeseries(model.DSS_Data):
         elif type == "Line":
             self.dss.Lines.Name(name)  # set current line as active
             phases = self.dss.Lines.Phases()
+            if phases == 1:
+                return voltage_matrix[:, 4::2]  # interested in current magnitudes for the lines
+            if phases == 3:
+                return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
+        elif type == "Transformer":
+            self.dss.Transformers.Name(name)  # set current line as active
+            phases = self.dss.Transformers.Phases()
             if phases == 1:
                 return voltage_matrix[:, 4::2]  # interested in current magnitudes for the lines
             if phases == 3:
