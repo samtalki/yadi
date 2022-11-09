@@ -207,28 +207,49 @@ class DSS_Timeseries(model.DSS_Data):
             self.initialize_qsts_duty()
 
     #  #################################################
-    #  ######### native Opendss - monthly QSTS #########
+    #  ######### native Opendss QSTS #########
     #  #################################################
 
     def get_loadBusAndVln(self):
         "Method to extract load buses from a feeder"
         loadBusDict = dict()
         loadVlnDict = dict()
-        elems = self.dss.Circuit.AllElementNames()
-        for elem in elems:
-            self.dss.Circuit.SetActiveElement(elem)
-            if "Load" in elem:
-                # extract load name
-                loadName = elem.split(".")[1]
-                # get bus name
-                buses = self.dss.CktElement.BusNames()
-                bus = buses[0]
-                # save name
-                loadBusDict[loadName] = bus
-                # extract load line-to-neutral voltage
-                self.dss.Loads.Name(loadName)
-                loadVlnDict[loadName] = self.dss.Loads.kV()
+        loads = self.dss.Loads.AllNames()
+        for load in loads:
+            # set load as active
+            self.dss.Loads.Name(load)
+            # name = self.dss.CktElement.Name()  # sanity check
+            # get bus name
+            buses = self.dss.CktElement.BusNames()
+            bus = buses[0]
+            # save name
+            loadBusDict[load] = bus
+            loadVlnDict[load] = self.dss.Loads.kV()
         return pd.Series(loadBusDict), pd.Series(loadVlnDict)
+
+    def get_trafoEAmps(self):
+        "Method to extract transformers emergency amps"
+        trafos = self.dss.Transformers.AllNames()
+        thermalLimitDict = dict()
+        for trafo in trafos:
+            self.dss.Transformers.Name(trafo)
+            # name = self.dss.CktElement.Name()  # sanity check
+            thermalLimitDict[trafo] = self.dss.CktElement.NormalAmps()
+        return pd.Series(thermalLimitDict)
+
+    def get_trafoPerPhaseEAmps(self):
+        "Method to extract transformers emergency amps"
+        trafos = self.dss.Transformers.AllNames()
+        thermalLimitDict = dict()
+        for trafo in trafos:
+            self.dss.Transformers.Name(trafo)
+            phases = self.dss.CktElement.NumPhases()
+            if phases > 1:
+                for ph in range(phases):
+                    thermalLimitDict[trafo + f".{ph + 1}"] = self.dss.CktElement.NormalAmps()
+            else:
+                thermalLimitDict[trafo] = self.dss.CktElement.NormalAmps()
+        return pd.Series(thermalLimitDict)
 
     def get_lineEAmps(self):
         "Method to extract line emergency amps"
@@ -237,6 +258,20 @@ class DSS_Timeseries(model.DSS_Data):
         for line in lines:
             self.dss.Lines.Name(line)
             thermalLimitDict[line] = self.dss.Lines.NormAmps()
+        return pd.Series(thermalLimitDict)
+
+    def get_linePerPhaseEAmps(self):
+        "Method to extract line emergency amps"
+        lines = self.dss.Lines.AllNames()
+        thermalLimitDict = dict()
+        for line in lines:
+            self.dss.Lines.Name(line)
+            phases = self.dss.Lines.Phases()
+            if phases > 1:
+                for ph in range(phases):
+                    thermalLimitDict[line + f".{ph + 1}"] = self.dss.Lines.NormAmps()
+            else:
+                thermalLimitDict[line] = self.dss.Lines.NormAmps()
         return pd.Series(thermalLimitDict)
 
     def initialize_qsts_duty(self, monitor_trafos=True, monitor_lines=True, monitor_loads=True, verbose=False):
@@ -255,7 +290,7 @@ class DSS_Timeseries(model.DSS_Data):
         if(monitor_lines):
             self.__set_monitor_all_lines(verbose=verbose)
 
-        if(monitor_lines):
+        if(monitor_trafos):
             self.__set_monitor_all_trafos(verbose=verbose)
 
         errs.append(
@@ -318,34 +353,41 @@ class DSS_Timeseries(model.DSS_Data):
                 continue
             # extract profiles
             if loadShapeName in kwLoadShapes.columns:
-                Pmult = list(kwLoadShapes.loc[:, loadShapeName].values)
+                Pmult = tuple(kwLoadShapes.loc[:, loadShapeName].values)
             else:
                 Pmult = None
             if loadShapeName in kvarLoadShapes.columns:
-                Qmult = list(kvarLoadShapes.loc[:, loadShapeName].values)
+                Qmult = tuple(kvarLoadShapes.loc[:, loadShapeName].values)
             else:
                 Qmult = None
 
+            # actually modify load
             if (Qmult is not None) and (Pmult is not None):
                 self.__modifyLoadShapePQ(Pmult, Qmult, loadShapeName)
-            elif kwLoadShapes.shape[1] == kvarLoadShapes.shape[1]:
+            else:  # not a load
                 self.dss.LoadShape.Name(loadShapeName)
-                offset = 3
+                offset = 3 
                 Pmult = self.dss.LoadShape.PMult()
-                self.__modifyLoadShapeP(Pmult[offset:], loadShapeName)
-            else:
-                self.__modifyLoadShapeP(Pmult, loadShapeName)
+                Pmult = np.asarray(Pmult[offset:])
+                self.__modifyLoadShapeP(tuple(Pmult), loadShapeName)
+            # check load modification
+            # self.dss.LoadShape.Name(loadShapeName)
+            # offset = 0
+            # Pmult = self.dss.LoadShape.PMult()
+            # Qmult = self.dss.LoadShape.QMult()
 
     def __modifyLoadShapeP(self, Pmult, name):
         self.dss.run_command(f"edit loadshape.{name} "
-                             f"Npts={len(Pmult)} "
-                             f"mult={Pmult} ")
+                             f"npts={len(Pmult)} "
+                             f"mult={Pmult} "
+                             "UseActual=False")
 
     def __modifyLoadShapePQ(self, Pmult, Qmult, name):
         self.dss.run_command(f"edit loadshape.{name} "
-                             f"Npts={len(Pmult)} "
+                             f"npts={len(Pmult)} "
                              f"mult={Pmult} "
-                             f"Qmult={Qmult}")
+                             f"qmult={Qmult} "
+                             "UseActual=True")
 
     def __extract_loadShapes(self):
         """extract loadshapes from dss file"""
@@ -510,11 +552,11 @@ class DSS_Timeseries(model.DSS_Data):
                 Qjk_dict[trafo_name] = Qjk[:, 0]
         
         Ijk_profiles = pd.DataFrame.from_dict(Ijk_dict)
-        Ijk_profiles = Ijk_profiles[self.offset:]
+        Ijk_profiles = Ijk_profiles.iloc[self.offset:, :]
         Pjk_profiles = pd.DataFrame.from_dict(Pjk_dict)
-        Pjk_profiles = Pjk_profiles[self.offset:]
+        Pjk_profiles = Pjk_profiles.iloc[self.offset:, :]
         Qjk_profiles = pd.DataFrame.from_dict(Qjk_dict)
-        Qjk_profiles = Qjk_profiles[self.offset:]
+        Qjk_profiles = Qjk_profiles.iloc[self.offset:, :]
 
         dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - self.offset, freq='H')
         Ijk_profiles = Ijk_profiles.set_index(dt_index)
@@ -543,11 +585,11 @@ class DSS_Timeseries(model.DSS_Data):
                 Qjk_dict[line_name] = Qjk[:, 0]
         
         Ijk_profiles = pd.DataFrame.from_dict(Ijk_dict)
-        Ijk_profiles = Ijk_profiles[self.offset:]
+        Ijk_profiles = Ijk_profiles.iloc[self.offset:, :]
         Pjk_profiles = pd.DataFrame.from_dict(Pjk_dict)
-        Pjk_profiles = Pjk_profiles[self.offset:]
+        Pjk_profiles = Pjk_profiles.iloc[self.offset:, :]
         Qjk_profiles = pd.DataFrame.from_dict(Qjk_dict)
-        Qjk_profiles = Qjk_profiles[self.offset:]
+        Qjk_profiles = Qjk_profiles.iloc[self.offset:, :]
 
         dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - self.offset, freq='H')
         Ijk_profiles = Ijk_profiles.set_index(dt_index)
@@ -568,11 +610,11 @@ class DSS_Timeseries(model.DSS_Data):
             kvar_dict[load_name] = kvars
         
         voltage_profiles = pd.DataFrame.from_dict(voltage_dict)
-        voltage_profiles = voltage_profiles[self.offset:]
+        voltage_profiles = voltage_profiles.iloc[self.offset:, :]
         kw_profiles = pd.DataFrame.from_dict(kw_dict)
-        kw_profiles = kw_profiles[self.offset:]
+        kw_profiles = kw_profiles.iloc[self.offset:, :]
         kvar_profiles = pd.DataFrame.from_dict(kvar_dict)
-        kvar_profiles = kvar_profiles[self.offset:]
+        kvar_profiles = kvar_profiles.iloc[self.offset:, :]
 
         dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps - self.offset, freq='H')
         voltage_profiles = voltage_profiles.set_index(dt_index)
@@ -611,11 +653,11 @@ class DSS_Timeseries(model.DSS_Data):
             self.dss.Lines.Name(name)  # set current line as active
             phases = self.dss.Lines.Phases()
             if phases == 1:
-                numCols = voltage_matrix.shape[1]
+                # numCols = voltage_matrix.shape[1]
                 # print(f"phase:{phases}-cols:{numCols}")
                 return voltage_matrix[:, 4]  # interested in current magnitudes for the lines
             if phases == 3:
-                numCols = voltage_matrix.shape[1]
+                # numCols = voltage_matrix.shape[1]
                 # print(f"phase:{phases}-cols:{numCols}")
                 return voltage_matrix[:, 8::2]  # interested in current magnitudes for the lines
         elif type == "Transformer":
@@ -623,11 +665,11 @@ class DSS_Timeseries(model.DSS_Data):
             # self.dss.Circuit.SetActiveElement(type + "." + name)
             phases = self.dss.CktElement.NumPhases()
             if phases == 1:
-                numCols = voltage_matrix.shape[1]
+                # numCols = voltage_matrix.shape[1]
                 # print(f"phase:{phases}-cols:{numCols}")
                 return voltage_matrix[:, 6]  # interested in current magnitudes for the lines
             if phases == 3:
-                numCols = voltage_matrix.shape[1]
+                # numCols = voltage_matrix.shape[1]
                 # print(f"phase:{phases}-cols:{numCols}")
                 return voltage_matrix[:, 10::2]  # interested in current magnitudes for the lines
         
@@ -641,10 +683,10 @@ class DSS_Timeseries(model.DSS_Data):
         if type == "Load":
             return power_matrix[:, 2], power_matrix[:, 3]  # interesteed in P1, Q1 for loads
         elif type == "Line":
-            numCols = power_matrix.shape[1]
+            # numCols = power_matrix.shape[1]
             # print(f"cols:{numCols}")
             return power_matrix[:, 2::2], power_matrix[:, 3::2]   # interesteed in Pjks and Qjks for the phases
         elif type == "Transformer":
-            numCols = power_matrix.shape[1]
+            # numCols = power_matrix.shape[1]
             # print(f"cols:{numCols}")
             return power_matrix[:, 2::2], power_matrix[:, 3::2]   # interesteed in Pjks and Qjks for the phases
