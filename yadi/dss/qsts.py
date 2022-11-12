@@ -199,10 +199,10 @@ class DSS_Timeseries(model.DSS_Data):
         """Check if QSTS has been properly initialized"""
          #Check to see if QSTS is initialized
         if(not self.__qsts_initialized):
-            warnings.warn("QSTS has not been initialized. Initiailizing before run.")
+            # warnings.warn("QSTS has not been initialized. Initiailizing before run.")
             self.initialize_qsts_duty()
         elif(self.__qsts_complete):
-            warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
+            # warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
             self.compile_dss(self.redirects)
             self.initialize_qsts_duty()
 
@@ -304,7 +304,7 @@ class DSS_Timeseries(model.DSS_Data):
         errs.append(
             self.dss.run_command('Set maxcontroliter=600')
         )
-        print('QSTS Initialized, Returned: ', [err for err in errs])
+        # print('QSTS Initialized, Returned: ', [err for err in errs])
         self.__qsts_initialized = True
 
     def run_yearly(self, userDemand=None):
