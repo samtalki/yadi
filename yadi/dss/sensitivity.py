@@ -13,7 +13,7 @@ import pandas as pd
 import os
 import warnings
 
-class DSS_Sensitivities(model.DSS_Model):
+class DSS_Sensitivities(model.DSS_Data):
 
     def __init__(self,redirects,verbose=True):
         super().__init__(redirects)
