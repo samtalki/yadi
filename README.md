@@ -4,6 +4,19 @@
 # ``yadi``: yet another DSS interface.
 `yadi` is software designed to help you tame the black magic that is distribution network models and make decisions with distribution network measurement data. It is primarily built on the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) by its authors, the Electric Power Research Institute. We interface with OpenDSS via [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and PyDSS. 
 
+
+## Quickstart
+We will use the [Hatch](https://hatch.pypa.io/latest/) python project manager, the default recommendation of the python packaging authority (PyPA) to ensure reproducible builds and environment management. 
+0. Ensure that Hatch is installed. [Follow the instructions for your operating system here.](https://hatch.pypa.io/latest/install/)
+1. Clone the repository.
+2. Navigate to the root directory.
+3. While in the root directory, [create a virtual environment](https://hatch.pypa.io/latest/environment/#creation) for this project with the command 
+`hatch env create`
+4. [Spawn a shell within the virtual environment](https://hatch.pypa.io/latest/environment/#entering-environments) by running the command 
+`hatch shell`
+5. Confirm that `yadi` is installed in your virtual environment with
+`pip show yadi`
+
 ## Why `yadi`?
 
 The distribution network modeling community is hiding from modern data science workflows. Many distribution researchers simply implement the same algorithms idiosyncratically over and over again, which has ***severely* limited** the ability of the power system community to develop higher-order iterations of network model analysis tools and algorithms. `yadi` makes it significantly easier to ask the kind of research questions that are useful for the modern, data-driven eletric power system engineer.
