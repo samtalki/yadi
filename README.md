@@ -6,14 +6,14 @@
 
 
 ## Quickstart
-We will use the [Hatch](https://hatch.pypa.io/latest/) python project manager, the default recommendation of the python packaging authority (PyPA) to ensure reproducible builds and environment management. 
-0. Ensure that Hatch is installed. [Follow the instructions for your operating system here.](https://hatch.pypa.io/latest/install/)
+`yadi` uses [Poetry](https://python-poetry.org/). 
+0. Ensure that Poetry is installed. [Follow the instructions for your operating system here.](https://python-poetry.org/docs/basic-usage/)
 1. Clone the repository.
 2. Navigate to the root directory.
-3. While in the root directory, [create a virtual environment](https://hatch.pypa.io/latest/environment/#creation) for this project with the command 
-`hatch env create`
-4. [Spawn a shell within the virtual environment](https://hatch.pypa.io/latest/environment/#entering-environments) by running the command 
-`hatch shell`
+3. While in the root directory, spawn and activate a virtual environment for this project with the command 
+`poetry shell`
+4. Install the dependencies with 
+`poetry install`
 5. Confirm that `yadi` is installed in your virtual environment with
 `pip show yadi`
 
