@@ -79,6 +79,64 @@ class DSS_Data:
             # df = dss.utils.class_to_dataframe(element)
         return df
 
+    def get_node_base_voltages(self):
+        """
+        Returns a pandas series of the per-unit base voltages for every node in the network.
+        """
+        # Create a dictionary to store the voltages
+        node_base_voltages = dict()
+        #Get all buses
+        buses = self.dss.Circuit.AllBusNames()
+        # Get the y node order (all nodes in the system) and their appropriate names. We will check for consistency later.
+        y_node_order = self.dss.Circuit.YNodeOrder()
+        # Iterate through all buses
+        for bus in buses:
+            # Set the active bus
+            self.dss.Circuit.SetActiveBus(bus)
+            # Get the base voltage
+            bus_base_voltage = self.dss.Bus.kVBase() # V_line to neutral Vbase for 1phase buses
+            # Get the nodes at this bus
+            bus_nodes = self.dss.Bus.Nodes()
+            # Iterate through all nodes at this bus
+            for node in bus_nodes:
+                # Set the name of the node to be the bus name plus the node number
+                node = bus + f'.{node}'
+                # Check if the node is in the y node order
+                if node not in y_node_order:
+                    # Make the node name consistent with the y node order.
+                    # For now, if the node name is not in the y node order, assume that it should be captilized and fix this.
+                    node = node.upper() #make the node name upper case
+                    # Check if the node is in the y node order
+                    if node not in y_node_order:
+                        #TODO: raise an error here, because this node is not in the y node order. This should never happen.
+                        #TODO: add other methods to fix this issue if it does happen.
+                        continue
+                # Save the base voltage for this node as the bus base voltage.
+                node_base_voltages[node] = bus_base_voltage
+        # Convert the dictionary to a pandas series
+        node_base_voltages = pd.Series(node_base_voltages)
+        return  node_base_voltages
+    
+    def get_node_voltages_mag_pu(self):
+        """
+        Gets a static dictionary of all of the nodal voltage magnitudes in per unit in the system at a single time step
+        """
+        voltages_dict = dict()
+        
+        nodes = self.dss.Circuit.YNodeOrder()
+        volts = self.dss.Circuit.YNodeVArray()
+        v_bases = self.get_node_base_voltages()
+
+        # organize the voltage for testing
+        Volts = np.asarray(volts)
+        V = Volts[0::2] +  1j*Volts[1::2]
+
+        for i, node in enumerate(nodes):
+            voltages_dict[node] = np.abs(V[i])/(v_bases[node]*1000) #NOTE: this is in per unit, and the base voltages are in kV.
+
+        self.voltages_dict = voltages_dict
+
+        return voltages_dict
 
     
     def get_node_voltages(self):

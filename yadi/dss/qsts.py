@@ -26,8 +26,8 @@ class DSS_Timeseries(model.DSS_Data):
         self.simulation_steps = simulation_steps
 
         #Voltage MVTS arrays
-        self.voltages_mvts = None # complex voltage phasors (not per unit)
-        self.vmags_pu_mvts = None # voltage magnitudes per unit
+        self.voltages_mvts = None # (m x n) multivariate timeseries of complex voltage phasors (not per unit)
+        self.vmags_pu_mvts = None # (m x n) multivariate timesries of voltage magnitudes in per unit
 
         #Current and power MVTS arrays
         self.currents_mvts = None
@@ -97,6 +97,7 @@ class DSS_Timeseries(model.DSS_Data):
      
         #Set internal fields for the data structure
         self.voltages_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
+        self.vmags_pu_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.double) #voltage magnitude multivariate timeseries array MxN
         self.complex_powers_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
         self.currents_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #current multivariate timeseries array MxN
         
@@ -106,12 +107,14 @@ class DSS_Timeseries(model.DSS_Data):
             if(err != ''):
                 warnings.warn('OpenDSS Raised a QSTS error: ',err)     
             voltages_dict_t = self.get_node_voltages()
+            vmags_pu_dict_t = self.get_node_voltages_mag_pu()
             currents_dict_t = self.get_node_currents() #get static current dict at timestep t
             complex_powers_dict_t = self.get_node_complex_powers() #get static voltage dict at timestep t
             for node_idx,node in enumerate(nodes):
-                self.voltages_mvts[it,node_idx] = voltages_dict_t[node] #fill in the MVTS array
-                self.currents_mvts[it,node_idx] = currents_dict_t[node] #fill in the MVTS array
-                self.complex_powers_mvts[it,node_idx] = complex_powers_dict_t[node] #fill in the MVTS array
+                self.vmags_pu_mvts[it,node_idx] = vmags_pu_dict_t[node] #fill in the MVTS array of nodal voltage magnitudes in per unit
+                self.voltages_mvts[it,node_idx] = voltages_dict_t[node] #fill in the MVTS array of nodal voltage phasors
+                self.currents_mvts[it,node_idx] = currents_dict_t[node] #fill in the MVTS array of nodal currents
+                self.complex_powers_mvts[it,node_idx] = complex_powers_dict_t[node] #fill in the MVTS array of nodal complex power injections
         self.__qsts_complete=True
 
     def get_system_deviations(self,granularity=900):
@@ -236,6 +239,7 @@ class DSS_Timeseries(model.DSS_Data):
          #Check to see if QSTS is initialized
         if(not self.__qsts_initialized):
             warnings.warn("QSTS has not been initialized. Initiailizing before run.")
+            self.compile_dss(self.redirects)
             self.initialize_qsts_duty()
         elif(self.__qsts_complete):
             warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
