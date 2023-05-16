@@ -6,16 +6,25 @@
 
 
 ## Quickstart
+
+### Setting up your environment
 `yadi` uses [Poetry](https://python-poetry.org/). 
-0. Ensure that Poetry is installed. [Follow the instructions for your operating system here.](https://python-poetry.org/docs/basic-usage/)
-1. Clone the repository.
-2. Navigate to the root directory.
-3. While in the root directory, spawn and activate a virtual environment for this project with the command 
+
+1. Ensure that Poetry is installed. [Follow the instructions for your operating system here.](https://python-poetry.org/docs/basic-usage/)
+2. Clone the repository.
+3. Navigate to the root directory.
+4. While in the root directory, spawn and activate a virtual environment for this project with the command 
 `poetry shell`
-4. Install the dependencies with 
+5. Install the dependencies with 
 `poetry install`
-5. Confirm that `yadi` is installed in your virtual environment with
+6. Confirm that `yadi` is installed in your virtual environment with
 `pip show yadi`
+
+### Optional: accessing the virtual envrionment with VS Code
+If you use VS Code, after following the above steps, and ensuring that your environment is activated, you can access the virtual environment for ``yadi`` within by running: 
+``code .``
+within  your poetry shell. You can then select the yadi environment as your python interpreter in the lower right.
+
 
 ## Why `yadi`?
 
