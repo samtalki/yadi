@@ -84,6 +84,8 @@ class DSS_Data:
     def get_node_voltages(self):
         """
         Get static dictionary of all node voltages in the system at a single timestep
+
+        #---- LOOK INTO NODES THAT HAVE ZERO VOLTAGE
         """
         voltages_dict = dict()
         

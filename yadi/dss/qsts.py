@@ -25,8 +25,11 @@ class DSS_Timeseries(model.DSS_Data):
         self.time_step = time_step
         self.simulation_steps = simulation_steps
 
-        #Initialize numpy MVTS arrays
-        self.voltages_mvts = None
+        #Voltage MVTS arrays
+        self.voltages_mvts = None # complex voltage phasors (not per unit)
+        self.vmags_pu_mvts = None # voltage magnitudes per unit
+
+        #Current and power MVTS arrays
         self.currents_mvts = None
         self.complex_powers_mvts = None
 
@@ -58,6 +61,10 @@ class DSS_Timeseries(model.DSS_Data):
         ---
             dss: the dss object
             element: name of the lement
+
+
+        TODO:
+        ---ADD MORE CONTROL OVER THE MATRICES THAT ARE GENERATED --- ONLY VMAG PER UNIT.
         """
         nodes = self.dss.Circuit.YNodeOrder()
         n_nodes = len(nodes)
@@ -80,7 +87,10 @@ class DSS_Timeseries(model.DSS_Data):
 
     def __run_qsts_duty(self,nodes,n_nodes):
         """
-        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage magnitudes, complex powers, and currents, for each node
+        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage phasors, complex powers, and currents, for each node
+
+        TODO--- CHECK COLUMNS WITH ZERO VOLTAGES #-------
+        
         """
         #Check QSTS initialization
         self.__check_qsts_initialization()
@@ -169,8 +179,11 @@ class DSS_Timeseries(model.DSS_Data):
         return D
 
 
-    def get_voltages_static(self):
-        """Gets the static voltages for all buses"""
+    def get_voltages_pu(self):
+        """Gets the static voltages for all buses
+        
+        TODO - add error handling, ensure that bus phases and nodes are returned.
+        """
         err = self.dss.run_command('solve')
         if(not err==""):
             print(err)
