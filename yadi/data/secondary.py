@@ -184,3 +184,91 @@ def calc_vph_active_sensitivities(Y,vph):
 def calc_vph_reactive_sensitivities(Y,vph):
     pass
     
+
+
+class SyntheticSecondaries:
+
+    def __init__(self,n_secondaries,nodes_per_sec,block_mean,block_std):
+        self.n_secondaries = n_secondaries
+        self.nodes_per_sec = nodes_per_sec
+        self.nodes_per_sec = nodes_per_sec 
+        self.block_mean = block_mean
+        self.block_std = block_std
+        self.S = self.make_sensitivities()
+
+    def make_sensitivities(self,nodes_per_sec=None):
+        """
+        This function generates a synthetic secondary sensitivity matrix depending on the number of secondaries and nodes per secondary
+        """
+        if nodes_per_sec is None:
+            nodes_per_sec = self.nodes_per_sec
+        else:
+            self.nodes_per_sec = nodes_per_sec
+        # Separate nodes_per_sec by types
+        if type(self.nodes_per_sec) is int or type(self.nodes_per_sec) is float:
+            return self.generate_block_data(self.block_mean,self.block_std) 
+        elif type(self.nodes_per_sec) is list:
+            if len(self.nodes_per_sec) == self.n_secondaries:
+                return self.generate_block_data(self.block_mean,self.block_std) 
+            else:
+                raise ValueError("nodes_per_sec must be a list of length n_secondaries")        
+        else:
+            raise ValueError("nodes_per_sec must be a list or a number")
+        
+    def generate_block_data(self,block_mean,block_std):
+        """
+        Generates random normal sensitivities for the entries of each secondary network subblocks
+        """
+        blocks = {}
+        for sec_idx in range(self.n_secondaries):
+            blocks['sec' + str(sec_idx)] = self.generate_block(block_mean,block_std)
+        return blocks
+    
+    def generate_block(self,block_mean,block_std):
+        """
+        Generates random normal sensitivities for the entries of a secondary network subblock
+        """
+        return np.random.normal(block_mean,block_std,(self.nodes_per_sec,self.nodes_per_sec))
+    
+    def get_localization(self,localization_type='nuclear'):
+        """
+        Gets the localization coefficient for the synthetic matrix
+        """
+        if localization_type in ['nuclear','nuc','nuclear_norm','nuc_norm','nuclear_norm']:
+            l = np.norm(self.S,ord='nuc')            
+        elif localization_type in ['opnorm','operator_norm','spectral','spectral_norm','2_norm','2',2]:
+            l = np.norm(self.S,ord=2)
+        else:
+            raise ValueError("localization_type must be nuclear or spectral")
+        return l
+    
+    def get_condition_number(self):
+        """
+        Gets the condition number of the synthetic matrix
+        """
+        return np.linalg.cond(self.S)
+    
+    def get_eigenvalues(self):
+        """
+        Gets the eigenvalues of the synthetic matrix
+        """
+        return np.linalg.eig(self.S)    
+    
+    def get_singular_values(self):
+        """
+        Gets the singular values of the synthetic matrix
+        """
+        return np.linalg.svd(self.S)    
+    
+    def get_rank(self):
+        """
+        Gets the rank of the synthetic matrix
+        """
+        return np.linalg.matrix_rank(self.S)    
+    
+    def get_sparsity(self): 
+        """
+        Gets the sparsity of the synthetic matrix
+        """
+        return np.count_nonzero(self.S)/self.S.size
+    
