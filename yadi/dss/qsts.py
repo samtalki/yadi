@@ -182,17 +182,6 @@ class DSS_Timeseries(model.DSS_Data):
         return D
 
 
-    def get_voltages_pu(self):
-        """Gets the static voltages for all buses
-        
-        TODO - add error handling, ensure that bus phases and nodes are returned.
-        """
-        err = self.dss.run_command('solve')
-        if(not err==""):
-            print(err)
-        voltages = self.dss.Circuit.AllBusMagPu()
-        return voltages,err
-
     def __export_monitor(self,monitor_name,verbose=False):
         """Exports a single monitor to a dataframe"""
         err = self.dss.run_command("export monitors {monitor_name}".format(

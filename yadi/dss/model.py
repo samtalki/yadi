@@ -166,6 +166,17 @@ class DSS_Data:
 
         return voltages_dict 
     
+    def get_bus_voltages_pu(self):
+        """Gets the static voltages for all buses
+        
+        TODO - add error handling, ensure that bus phases and nodes are returned.
+        """
+        err = self.dss.run_command('solve')
+        if(not err==""):
+            print(err)
+        voltages = self.dss.Circuit.AllBusMagPu()
+        return voltages,err
+    
     def get_node_currents(self):
         """
         Get static dictionary of all node currents in the system at a single timestep
