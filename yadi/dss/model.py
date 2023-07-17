@@ -8,6 +8,7 @@ October 2021
 import numpy as np
 import pandas as pd
 import opendssdirect as dss
+import warnings
 
 
 ELEMENT_CLASSES = {
@@ -41,6 +42,7 @@ class DSS_Data:
         self.currents_dict = dict() #Internal (nodal current injections) currents_dict (static) at a single timestep
         self.voltages_dict = dict() #Internal voltages_dict (static) at a single timestep
         self.powers_dict = dict() #Internal complex powers dict (static) at a single timestep
+        self.line_currents_dict = dict() #Internal line currents dict (static) at a single timestep
         #Compile all redirect files
         self.compile_dss(redirects)
 
@@ -200,7 +202,7 @@ class DSS_Data:
 
     def get_node_complex_powers(self):
         """
-        Get static dictionary of all node complex powers in the system at a single timestep
+        Get static dictionary of all nodal complex power injections in the system at a single timestep
         """
         powers_dict = dict()
         if(self.currents_dict == None or self.voltages_dict == None):
@@ -250,46 +252,115 @@ class DSS_Data:
         
         return Y_net, volts
 
-    def get_line_data():
+    def get_line_data(self):
         """
-        Gets dictionaries of line data, specifically:
+        Returns dictionaries of line data, specifically:
             -BusNames: Array of strings. Get Bus definitions to which each terminal is connected. 0-based array.
             -NumTerminals: Number of Terminals this Circuit Element
             -NumConductors: Number of Conductors per Terminal
             -NodeOrder: Array of integer containing the node numbers (representing phases, for example) for each conductor of each terminal.
         """
         data_lines = {}
-        names_lines = dss.Lines.AllNames()
-        line_idx,line = 0,dss.Lines.First()
+        names_lines = self.dss.Lines.AllNames()
+        line_idx,line = 0,self.dss.Lines.First()
         while line:
             name_line = names_lines[line_idx] #get name of line
             # Get line data
             line_data = {
-                'BusNames': dss.CktElement.BusNames(),
-                'NumTerminals': dss.CktElement.NumTerminals(),
-                'NumConductors': dss.CktElement.NumConductors(),
-                'NodeOrder': dss.CktElement.NodeOrder(),
-                'Phases': dss.Lines.Phases(), #number of phases
-                'NormAmps': dss.Lines.NormAmps(), #normal ampere rating
-                'EmergAmps': dss.Lines.EmergAmps(), #emergency ampere rating
+                'BusNames': self.dss.CktElement.BusNames(),
+                'NumTerminals': self.dss.CktElement.NumTerminals(),
+                'NumConductors': self.dss.CktElement.NumConductors(),
+                'NodeOrder': self.dss.CktElement.NodeOrder(),
+                'Phases': self.dss.Lines.Phases(), #number of phases
+                'NormAmps': self.dss.Lines.NormAmps(), #normal ampere rating
+                'EmergAmps': self.dss.Lines.EmergAmps(), #emergency ampere rating
             }
             data_lines[name_line] = line_data # Save the data for this line      
-            line = dss.Lines.Next() #increment line
+            line = self.dss.Lines.Next() #increment line
             line_idx += 1 #increment index
         return data_lines
-
-
-    def get_line_currents(self):
+    
+    def get_line_ratings(self):
         """
-        Gets the lines currents in the system at a single timestep
+        Returns a dictionary of the nominal and emergency ratings for each line.
         """
-        pass
-        # line = self.dss.Lines.First()
-        # currents = []
-        # while line:
-        #     currents.append(self.dss.CktElement.Currents())
-        #     line = self.dss.Lines.Next()
-        # return currents
+        ratings_lines = {}
+        names_lines = self.dss.Lines.AllNames()
+        line_idx,line = 0,self.dss.Lines.First()
+        while line:
+            name_line = names_lines[line_idx]
+            # Get line ratings
+            line_ratings = {
+                'NormAmps': self.dss.Lines.NormAmps(), #normal ampere rating
+                'EmergAmps': self.dss.Lines.EmergAmps(), #emergency ampere rating
+            }
+            ratings_lines[name_line] = line_ratings # Save the ratings for this line
+            line = self.dss.Lines.Next() #increment line
+            line_idx += 1 #increment index
+        return ratings_lines
+
+    def get_line_currents(self,structure="dict"):
+        """
+        Gets the lines currents in the system at the current timestep/solution. 
+        The first key is always the line name.
+
+        Parameters
+        ----------
+        structure : str, optional
+            The structure of the output. The default is "dict".
+            - If structure == "dict": 
+                - Then the value is a dictionary, where:
+                - The first key is the terminal number (1,2), 
+                    - i.e., whether to extract the current flowing from terminal 1->2 or 2->1.
+                - The second key is the phase (a,b,c)
+                - The value is the from-to current for that terminal and phase
+            - If structure == "matrix":
+                - Then the value is a 2x3 matrix, where:
+                - The rows are the terminals (from or to) and the columns are the phases \in {a,b,c}
+        Note that I_{n1,n2}^{(\phi)} != I_{n2,n1}^{(\phi)} in general.
+        """
+        
+        network_currents = {}
+        names_lines = self.dss.Lines.AllNames()
+        line_idx,line = 0,self.dss.Lines.First()
+
+        while line: #iterate over lines
+            line_label = names_lines[line_idx] #get name of line
+            R2n_line_currents = np.asarray(self.dss.CktElement.Currents()) #get network_currents at this line (R^{2n})
+            line_currents = R2n_line_currents[0::2] + 1j*R2n_line_currents[1::2] #convert to complex
+            num_terminals = self.dss.CktElement.NumTerminals() #get number of terminals
+            num_phases = self.dss.Lines.Phases() #get number of phases
+
+            # Check that the number of terminals and phases are valid
+            if num_terminals < 2:
+                raise Exception("There is a floating line, check that each line has two terminals.")
+            if num_phases == 0:
+                raise Exception("Invalid line specification. There are no phases in this line.")
+
+            # Get line currents in the appropriate structure
+            if structure == "matrix":
+                f_currents = line_currents[0:num_phases]
+                t_currents = line_currents[num_phases:]        
+                # 2xnum_phases matrix, where the rows are the terminals (from or to) and the columns are the phases \in {a,b,c}
+                network_currents[line_label] = np.vstack((f_currents,t_currents)) 
+            elif structure == "dict":
+                terminal_currents = {} # dictionary of dictionaries of phase currents for each terminal
+                for term_idx in range(num_terminals): #terminal index (0,1)
+                    phase_currents = {} # dictionary of currents by phase for the current terminal terminal
+                    terminal_label = str(term_idx+1) #terminal label (1,2)
+                    for ph_idx in range(num_phases): #phase index (0,1,2)
+                        phase_number = self.dss.CktElement.NodeOrder()[ph_idx] #phase number: (0,1,2) -> (1,2,3)
+                        phase_label =  self.__make_phase_label(phase_number) #phase_label: (1,2,3) -> (a,b,c)
+                        phase_currents[phase_label] = line_currents[term_idx*num_phases+ph_idx]
+                    terminal_currents[terminal_label] = phase_currents
+                network_currents[line_label] = terminal_currents
+            else:
+                raise Exception("Invalid structure. Must be 'matrix', 'dict', or 'dict2'")
+
+            line = self.dss.Lines.Next() #increment line
+            line_idx += 1 #increment index
+
+        return network_currents
     
 
     def get_transformer_currents(self):
@@ -300,6 +371,25 @@ class DSS_Data:
         #self.dss.Transformers.WdgCurrents()
 
 
+    def __make_phase_label(
+        phase_number : int, # 1,2,3
+        mapping = {
+            1: 'a',
+            2: 'b',
+            3: 'c'
+        }
+    ):
+        """
+        Makes a phase label ('a','b','c') from a phase number (1,2,3)
+        """
+        if phase_number not in mapping.keys():
+            if phase_number == 0:
+                warnings.warn("Phase number is 0. Assuming you meant '1' -> 'a'")
+                return mapping[1]
+            else:    
+                raise Exception("Invalid phase number. Must be in {1,2,3}")
+        else:
+            return mapping[phase_number]
 
     def __initialization(self):
         """Initializies basic DSS parameters"""
