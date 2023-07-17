@@ -270,6 +270,8 @@ class DSS_Data:
                 'NumConductors': dss.CktElement.NumConductors(),
                 'NodeOrder': dss.CktElement.NodeOrder(),
                 'Phases': dss.Lines.Phases(), #number of phases
+                'NormAmps': dss.Lines.NormAmps(), #normal ampere rating
+                'EmergAmps': dss.Lines.EmergAmps(), #emergency ampere rating
             }
             data_lines[name_line] = line_data # Save the data for this line      
             line = dss.Lines.Next() #increment line
