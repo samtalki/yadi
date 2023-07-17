@@ -38,7 +38,7 @@ class DSS_Data:
         self.verbose=verbose
         self.redirects = None
         self.Y_net = None #internal ybus
-        self.currents_dict = dict() #Internal currents_dict (static) at a single timestep
+        self.currents_dict = dict() #Internal (nodal current injections) currents_dict (static) at a single timestep
         self.voltages_dict = dict() #Internal voltages_dict (static) at a single timestep
         self.powers_dict = dict() #Internal complex powers dict (static) at a single timestep
         #Compile all redirect files
@@ -249,6 +249,54 @@ class DSS_Data:
         self.Y_net = Y_net
         
         return Y_net, volts
+
+    def get_line_data():
+        """
+        Gets dictionaries of line data, specifically:
+            -BusNames: Array of strings. Get Bus definitions to which each terminal is connected. 0-based array.
+            -NumTerminals: Number of Terminals this Circuit Element
+            -NumConductors: Number of Conductors per Terminal
+            -NodeOrder: Array of integer containing the node numbers (representing phases, for example) for each conductor of each terminal.
+        """
+        data_lines = {}
+        names_lines = dss.Lines.AllNames()
+        line_idx,line = 0,dss.Lines.First()
+        while line:
+            name_line = names_lines[line_idx] #get name of line
+            # Get line data
+            line_data = {
+                'BusNames': dss.CktElement.BusNames(),
+                'NumTerminals': dss.CktElement.NumTerminals(),
+                'NumConductors': dss.CktElement.NumConductors(),
+                'NodeOrder': dss.CktElement.NodeOrder(),
+                'Phases': dss.Lines.Phases(), #number of phases
+            }
+            data_lines[name_line] = line_data # Save the data for this line      
+            line = dss.Lines.Next() #increment line
+            line_idx += 1 #increment index
+        return data_lines
+
+
+    def get_line_currents(self):
+        """
+        Gets the lines currents in the system at a single timestep
+        """
+        pass
+        # line = self.dss.Lines.First()
+        # currents = []
+        # while line:
+        #     currents.append(self.dss.CktElement.Currents())
+        #     line = self.dss.Lines.Next()
+        # return currents
+    
+
+    def get_transformer_currents(self):
+        """
+        Retrieve currents for transformer delivery elements only        
+        """
+        pass
+        #self.dss.Transformers.WdgCurrents()
+
 
 
     def __initialization(self):
