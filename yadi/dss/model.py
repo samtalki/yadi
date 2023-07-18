@@ -215,7 +215,10 @@ class DSS_Data:
 
 
     def get_node_ybus(self, init):
-        
+        """
+        Gets the Ybus matrix for the network at the current timestep/solution.
+        """
+        warnings.warn("This method is deprecated. It is recommended to use the internal yadi.dss.YMatrix module instead.")
         if init == True:
             self.__initialization()
 
