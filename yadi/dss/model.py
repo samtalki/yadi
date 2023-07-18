@@ -303,7 +303,7 @@ class DSS_Data:
             line_idx += 1 #increment index
         return ratings_lines
 
-    def get_line_currents(self,structure="dict"):
+    def get_line_currents(self,structure="matrix"):
         """
         Gets the lines currents in the system at the current timestep/solution. 
         The first key is always the line name.
@@ -311,7 +311,7 @@ class DSS_Data:
         Parameters
         ----------
         structure : str, optional
-            The structure of the output. The default is "dict".
+            The structure of the output. The default is "matrix".
             - If structure == "dict": 
                 - Then the value is a dictionary, where:
                 - The first key is the terminal number (1,2), 
@@ -367,7 +367,7 @@ class DSS_Data:
         return network_line_currents
     
 
-    def get_transformer_currents(self,structure='matrix',include_neutral=True):
+    def get_xfmr_currents(self,structure='matrix',include_neutral=True):
         """
         Gets the transformer currents in the system at the current timestep/solution. 
         The first key is always the transformer name.
@@ -412,7 +412,7 @@ class DSS_Data:
         self.xfmer_currents_dict = network_xfmr_currents # Save the network transformer current dictionary
         return network_xfmr_currents
 
-    def get_transformer_ratings(self):
+    def get_xfmr_ratings(self):
         """
         Returns a dictionary of the nominal and emergency ratings for each transformer.
         """
@@ -422,16 +422,12 @@ class DSS_Data:
         while xfmr:
             name_xfmr = names_xfmrs[xfmr_idx]
             # Get xfmr ratings
-            xfmr_ratings = {
-                'NormAmps': self.dss.Transformers.NormAmps(), #normal ampere rating
-                'EmergAmps': self.dss.Transformers.EmergAmps(), #emergency ampere rating
-            }
-            ratings_xfmrs[name_xfmr] = xfmr_ratings
+            ratings_xfmrs[name_xfmr] = self.dss.Transformers.kVA()
             xfmr = self.dss.Transformers.Next() #increment xfmr
             xfmr_idx += 1 #increment index
         return ratings_xfmrs
 
-    def get_transformer_data(self):
+    def get_xfmr_data(self):
         """
         Returns dictionaries of xfmer data, specifically:
             -isDelta: bool: Whether the transormer is delta or wye
@@ -448,19 +444,38 @@ class DSS_Data:
             xfmr_data = {
                 'isDelta': self.dss.Transformers.IsDelta(),
                 'NumWindings' : self.dss.Transformers.NumWindings(),
-                'minTap' : self.dss.Transformers.MinTap(), #minimum tap position
+                'MinTap' : self.dss.Transformers.MinTap(), #minimum tap position
+                'MaxTap' : self.dss.Transformers.MaxTap(), #maximum tap position
                 'NumTerminals': self.dss.CktElement.NumTerminals(),
                 'NumConductors': self.dss.CktElement.NumConductors(),
                 'NodeOrder': self.dss.CktElement.NodeOrder(),
-                'Phases': self.dss.Transformers.NumPhases(), #number of phases
-                'NormAmps': self.dss.Transformers.NormAmps(), #normal ampere rating
-                'EmergAmps': self.dss.Transformers.EmergAmps(), #emergency ampere rating
             }
             data_xfmrs[name_xfmr] = xfmr_data # Save the data for this xfmr
-            xfmr = self.dss.Transformers.Next() #increment xfmr
+            xfmr = dss.Transformers.Next() #increment xfmr
             xfmr_idx += 1 #increment index
         return data_xfmrs
 
+    #TODO: add a method to get the line and xfmr conductor+phase labels to conductor index
+    def get_xfmr_conductor_idx_map(self,flow_direction,include_neutral=True):
+        """
+        Makes a nested dictionary mapping the conductor terminal->phase->conductor index.
+        """
+        #-----
+        warnings.warn("This method is not yet implemented, doing nothing.")
+        pass
+        #-----
+
+
+        term_idx = {} # dictionary of dictionaries of phase currents for each terminal
+        for term_idx in range(num_terminals): #terminal index (0,1)
+            phase_currents = {} # dictionary of currents by phase for the current terminal terminal
+            terminal_label = str(term_idx+1) #terminal label (1,2)
+            for ph_idx in range(num_phases): #phase index (0,1,2)
+                phase_number = self.dss.CktElement.NodeOrder()[ph_idx] #phase number: (0,1,2) -> (1,2,3)
+                phase_label =  self.__make_phase_label(phase_number) #phase_label: (1,2,3) -> (a,b,c)
+                phase_currents[phase_label] = line_currents[term_idx*num_phases+ph_idx]
+            terminal_currents[terminal_label] = phase_currents
+        network_line_currents[line_label] = terminal_currents
 
     def __make_phase_label(
         phase_number : int, # 1,2,3
