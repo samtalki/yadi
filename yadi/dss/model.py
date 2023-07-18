@@ -43,6 +43,7 @@ class DSS_Data:
         self.voltages_dict = dict() #Internal voltages_dict (static) at a single timestep
         self.powers_dict = dict() #Internal complex powers dict (static) at a single timestep
         self.line_currents_dict = dict() #Internal line currents dict (static) at a single timestep
+        self.xfmer_currents_dict = dict() #Internal transformer currents dict (static) at a single timestep
         #Compile all redirect files
         self.compile_dss(redirects)
 
@@ -320,13 +321,13 @@ class DSS_Data:
         Note that I_{n1,n2}^{(\phi)} != I_{n2,n1}^{(\phi)} in general.
         """
         
-        network_currents = {}
+        network_line_currents = {}
         names_lines = self.dss.Lines.AllNames()
         line_idx,line = 0,self.dss.Lines.First()
 
         while line: #iterate over lines
             line_label = names_lines[line_idx] #get name of line
-            R2n_line_currents = np.asarray(self.dss.CktElement.Currents()) #get network_currents at this line (R^{2n})
+            R2n_line_currents = np.asarray(self.dss.CktElement.Currents()) #get line currents at this line (dimensionality R^{2n})
             line_currents = R2n_line_currents[0::2] + 1j*R2n_line_currents[1::2] #convert to complex
             num_terminals = self.dss.CktElement.NumTerminals() #get number of terminals
             num_phases = self.dss.Lines.Phases() #get number of phases
@@ -342,7 +343,7 @@ class DSS_Data:
                 f_currents = line_currents[0:num_phases]
                 t_currents = line_currents[num_phases:]        
                 # 2xnum_phases matrix, where the rows are the terminals (from or to) and the columns are the phases \in {a,b,c}
-                network_currents[line_label] = np.vstack((f_currents,t_currents)) 
+                network_line_currents[line_label] = np.vstack((f_currents,t_currents)) 
             elif structure == "dict":
                 terminal_currents = {} # dictionary of dictionaries of phase currents for each terminal
                 for term_idx in range(num_terminals): #terminal index (0,1)
@@ -353,22 +354,109 @@ class DSS_Data:
                         phase_label =  self.__make_phase_label(phase_number) #phase_label: (1,2,3) -> (a,b,c)
                         phase_currents[phase_label] = line_currents[term_idx*num_phases+ph_idx]
                     terminal_currents[terminal_label] = phase_currents
-                network_currents[line_label] = terminal_currents
+                network_line_currents[line_label] = terminal_currents
             else:
-                raise Exception("Invalid structure. Must be 'matrix', 'dict', or 'dict2'")
+                raise Exception("Invalid structure. Must be 'matrix', or 'dict'.")
 
             line = self.dss.Lines.Next() #increment line
             line_idx += 1 #increment index
-
-        return network_currents
+        self.line_currents_dict = network_line_currents
+        return network_line_currents
     
 
-    def get_transformer_currents(self):
+    def get_transformer_currents(self,structure='matrix',include_neutral=True):
         """
-        Retrieve currents for transformer delivery elements only        
+        Gets the transformer currents in the system at the current timestep/solution. 
+        The first key is always the transformer name.
+
+        Parameters:
+            - include_neutral : Bool - whether or not to include the neutral phase in the extracted currents. Defaults to true.
         """
-        pass
-        #self.dss.Transformers.WdgCurrents()
+        network_xfmr_currents = {}
+        names_xfmrs = self.dss.Transformers.AllNames()
+        xfmr_idx,xfmr = 0,self.dss.Transformers.First()
+        while xfmr:
+            xfmr_label = names_xfmrs[xfmr_idx] #get name of xfmr
+            # get the transformer phase currents --- note that this includes a subset of {a,b,c} and {0}, where {0} is the neutral
+            R2n_xfmr_currents = np.asarray(self.dss.CktElement.Currents()) #get line currents at this line (dimensionality R^{2n})
+            xfmr_currents = R2n_xfmr_currents[0::2] + 1j*R2n_xfmr_currents[1::2] #convert to complex
+            num_terminals = self.dss.CktElement.NumTerminals() #get number of terminals
+            num_phases = self.dss.CktElement.NumConductors() #get number of phases --- note this includes the Neutral conductor.
+            if structure == 'dict':
+                warnings.warn("Dict structure not yet implemented for transformer currents. Returning matrix structure.")
+                structure = 'matrix'
+            if structure == 'matrix':
+                if include_neutral: #include all phases in the node order.    
+                    f_currents = xfmr_currents[0:num_phases]
+                    t_currents = xfmr_currents[num_phases:]        
+                    # 2xnum_phases matrix, where the rows are the terminals (from or to) and the columns are the phases \in {a,b,c}
+                    network_xfmr_currents[xfmr_label] = np.vstack((f_currents,t_currents)) 
+                else: #do not include the neutral phase of the transformers. Warning: this may cause issues with relating to the Ybus order.
+                    if self.dss.CktElement.NodeOrder()[num_phases-1] == 0: #check that the neutral phase is the last phase
+                        f_currents = xfmr_currents[0:num_phases-1] # -1 to exclude the neutral phase
+                        t_currents = xfmr_currents[num_phases:-1] # -1 to exclude the neutral phase
+                        # 2x(num_phases-1) matrix, where the rows are the terminals (from or to) and the columns are the phases \in {a,b,c}
+                        network_xfmr_currents[xfmr_label] = np.vstack((f_currents,t_currents))
+                    else:
+                        raise Exception(
+                            "Invalid specification of transformer {x}. The neutral phase is not the last phase. Please re-order the phases".format(
+                                x=xfmr_label
+                            ))
+            else:
+                raise Exception("Invalid structure. Must be 'matrix', or 'dict'.")
+            xfmr = self.dss.Transformers.Next() 
+            xfmr_idx += 1 #increment index
+        self.xfmer_currents_dict = network_xfmr_currents # Save the network transformer current dictionary
+        return network_xfmr_currents
+
+    def get_transformer_ratings(self):
+        """
+        Returns a dictionary of the nominal and emergency ratings for each transformer.
+        """
+        ratings_xfmrs = {}
+        names_xfmrs = self.dss.Transformers.AllNames()
+        xfmr_idx,xfmr = 0,self.dss.Transformers.First()
+        while xfmr:
+            name_xfmr = names_xfmrs[xfmr_idx]
+            # Get xfmr ratings
+            xfmr_ratings = {
+                'NormAmps': self.dss.Transformers.NormAmps(), #normal ampere rating
+                'EmergAmps': self.dss.Transformers.EmergAmps(), #emergency ampere rating
+            }
+            ratings_xfmrs[name_xfmr] = xfmr_ratings
+            xfmr = self.dss.Transformers.Next() #increment xfmr
+            xfmr_idx += 1 #increment index
+        return ratings_xfmrs
+
+    def get_transformer_data(self):
+        """
+        Returns dictionaries of xfmer data, specifically:
+            -isDelta: bool: Whether the transormer is delta or wye
+            -NumTerminals: Number of Terminals this Circuit Element
+            -NumConductors: Number of Conductors per Terminal
+            -NodeOrder: Array of integer containing the node numbers (representing phases, for example) for each conductor of each terminal.
+        """
+        data_xfmrs = {}
+        names_xfmrs = self.dss.Transformers.AllNames()
+        xfmr_idx,xfmr = 0,self.dss.Transformers.First()
+        while xfmr:
+            name_xfmr = names_xfmrs[xfmr_idx]
+            # Get xfmr data
+            xfmr_data = {
+                'isDelta': self.dss.Transformers.IsDelta(),
+                'NumWindings' : self.dss.Transformers.NumWindings(),
+                'minTap' : self.dss.Transformers.MinTap(), #minimum tap position
+                'NumTerminals': self.dss.CktElement.NumTerminals(),
+                'NumConductors': self.dss.CktElement.NumConductors(),
+                'NodeOrder': self.dss.CktElement.NodeOrder(),
+                'Phases': self.dss.Transformers.NumPhases(), #number of phases
+                'NormAmps': self.dss.Transformers.NormAmps(), #normal ampere rating
+                'EmergAmps': self.dss.Transformers.EmergAmps(), #emergency ampere rating
+            }
+            data_xfmrs[name_xfmr] = xfmr_data # Save the data for this xfmr
+            xfmr = self.dss.Transformers.Next() #increment xfmr
+            xfmr_idx += 1 #increment index
+        return data_xfmrs
 
 
     def __make_phase_label(
