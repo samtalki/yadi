@@ -20,10 +20,31 @@ from calendar import monthrange
 
 class DSS_Timeseries(model.DSS_Data):
 
-    def __init__(self,redirects,time_step,simulation_steps):
+    def __init__(self,redirects,time_step,simulation_steps,
+        data_structure='matrix', # 'matrix' or 'dict'
+        flow_direction='from', # 'from' or 'to'
+        verbose=True,
+        per_unit=True):
+        """
+        Quasi-Static Time Series (QSTS) simulation data structure for OpenDSS networks.
+        Inherits from the DSS_Data class.
+
+        Parameters:
+            - redirects (list): List of strings of filepaths to .dss files
+            - time_step (int): Timestep in seconds
+            - simulation_steps (int): Number of simulation steps
+            - data_structure (str): Data structure to use for storing the timeseries data. Options are 'matrix' or 'dict'
+            - flow_direction (str): The direction of the line and xfmr flow values. Options are 'from' or 'to'
+            - verbose (boolean): whether or not to print verbose logs
+            - per_unit (boolean): whether or not to return per unit values at all times (default is False) #TODO
+        """
         super().__init__(redirects)
         self.time_step = time_step
         self.simulation_steps = simulation_steps
+        self.data_structure = data_structure
+        self.flow_direction = flow_direction
+        self.verbose = verbose
+        self.per_unit = per_unit #TODO: Add optional functionality to force per unit in all data structures
 
         #Voltage MVTS arrays
         self.voltages_mvts = None # (m x n) multivariate timeseries of complex voltage phasors (not per unit)
@@ -32,6 +53,10 @@ class DSS_Timeseries(model.DSS_Data):
         #Current and power MVTS arrays
         self.currents_mvts = None
         self.complex_powers_mvts = None
+
+        #Line currents and xfmr currents multivariate timeseries (MVTS) arrays
+        self.line_currents_mvts = None
+        self.xfmr_currents_mvts = None
 
         #nodal mvts_dfs
         self.nodal_mvts_dfs = None
@@ -66,6 +91,8 @@ class DSS_Timeseries(model.DSS_Data):
         TODO:
         ---ADD MORE CONTROL OVER THE MATRICES THAT ARE GENERATED --- ONLY VMAG PER UNIT.
         """
+        
+        # All electircal nodes in the system - includes all individual conductors/phases
         nodes = self.dss.Circuit.YNodeOrder()
         n_nodes = len(nodes)
         
@@ -84,23 +111,40 @@ class DSS_Timeseries(model.DSS_Data):
             nodal_mvts_dfs[node] = D_i          
         self.nodal_mvts_dfs = nodal_mvts_dfs
 
-
+    #TODO: Check columns with zero voltages
+    #TODO: Optional parameter to only save certain variables for memory efficiency
+    #TODO: Enable no-neutral xfmr currents
     def __run_qsts_duty(self,nodes,n_nodes):
         """
         Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage phasors, complex powers, and currents, for each node
-
-        TODO--- CHECK COLUMNS WITH ZERO VOLTAGES #-------
-        
         """
         #Check QSTS initialization
-        self.__check_qsts_initialization()
+        #self.__check_qsts_initialization()
+        self.compile_dss(self.redirects)
+        self.initialize_qsts_duty()
      
+        # Get the names of all lines and transformers, 
+        names_lines = self.dss.Lines.AllNames()
+        names_xfmrs = self.dss.Transformers.AllNames()
+
+        # Get the data for all lines and transformers (Num conductors, phases, etc.)
+        data_lines = self.get_line_data()
+        data_xfmrs = self.get_xfmr_data()
+
+        # Get the total number of condutors for all lines and transformers
+        n_cond_lines = [data_lines[name]['NumConductors'] for name in names_lines]
+        n_cond_xfmrs = [data_xfmrs[name]['NumConductors'] for name in names_xfmrs]
+        tot_cond_lines = np.sum(n_cond_lines)
+        tot_cond_xfmrs = np.sum(n_cond_xfmrs)
+
         #Set internal fields for the data structure
         self.voltages_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
         self.vmags_pu_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.double) #voltage magnitude multivariate timeseries array MxN
         self.complex_powers_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
         self.currents_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #current multivariate timeseries array MxN
-        
+        self.line_currents_mvts = np.empty((self.simulation_steps,tot_cond_lines),dtype=np.cdouble) #line current multivariate timeseries array MxN
+        self.xfmr_currents_mvts = np.empty((self.simulation_steps,tot_cond_xfmrs),dtype=np.cdouble) #xfmr current multivariate timeseries array MxN
+
         #Run Duty mode qsts
         for it in tqdm (range (self.simulation_steps), desc="QSTS running..."):  
             err = self.dss.run_command('solve')
@@ -110,11 +154,56 @@ class DSS_Timeseries(model.DSS_Data):
             vmags_pu_dict_t = self.get_node_voltages_mag_pu()
             currents_dict_t = self.get_node_currents() #get static current dict at timestep t
             complex_powers_dict_t = self.get_node_complex_powers() #get static voltage dict at timestep t
+            line_currents_dict_t = self.get_line_currents(structure=self.data_structure)#,flow_direction=self.flow_direction # TODO: Add flow direction)
+            xmfr_currents_dict_t = self.get_xfmr_currents(structure=self.data_structure)#,flow_direction=self.flow_direction # TODO: Add flow direction)
+
+            # Fill in the nodal bus injection arrays
             for node_idx,node in enumerate(nodes):
                 self.vmags_pu_mvts[it,node_idx] = vmags_pu_dict_t[node] #fill in the MVTS array of nodal voltage magnitudes in per unit
                 self.voltages_mvts[it,node_idx] = voltages_dict_t[node] #fill in the MVTS array of nodal voltage phasors
                 self.currents_mvts[it,node_idx] = currents_dict_t[node] #fill in the MVTS array of nodal currents
                 self.complex_powers_mvts[it,node_idx] = complex_powers_dict_t[node] #fill in the MVTS array of nodal complex power injections
+            
+            # Fill in the line flow arrays
+            line_idx,line = 0,self.dss.Lines.First()
+            while line:
+                name = names_lines[line_idx]
+                n_cond = n_cond_lines[line_idx]
+                if self.data_structure == 'dict':
+                    warnings.warn("Line currents not yet supported for dict data structure, using matrix instead")
+                    self.data_structure = 'matrix'
+                if self.data_structure == 'matrix':
+                    if self.flow_direction == 'from':
+                        self.line_currents_mvts[it,line_idx:line_idx+n_cond] = line_currents_dict_t[name][0,:]
+                    elif self.flow_direction == 'to':
+                        self.line_currents_mvts[it,line_idx:line_idx+n_cond] = line_currents_dict_t[name][1,:]
+                    else:
+                        raise ValueError("Invalid flow direction. Options are 'from' or 'to'")
+                else:
+                    raise ValueError("Invalid data structure. Options are 'matrix' or 'dict'")
+                line_idx+= 1
+                line = self.dss.Lines.Next()
+
+            # Fill in the xfmr flow arrays
+            xfmr_idx,xfmr = 0,self.dss.Transformers.First()
+            while xfmr:
+                name = names_xfmrs[xfmr_idx]
+                n_cond = n_cond_xfmrs[xfmr_idx]
+                if self.data_structure == 'dict':
+                    warnings.warn("Xfmr currents not yet supported for dict data structure, using matrix instead")
+                    self.data_structure = 'matrix'
+                if self.data_structure == 'matrix':
+                    if self.flow_direction == 'from':
+                        self.xfmr_currents_mvts[it,xfmr_idx:xfmr_idx+n_cond] = xmfr_currents_dict_t[name][0,:]
+                    elif self.flow_direction == 'to':
+                        self.xfmr_currents_mvts[it,xfmr_idx:xfmr_idx+n_cond] = xmfr_currents_dict_t[name][1,:]
+                    else:
+                        raise ValueError("Invalid flow direction. Options are 'from' or 'to'")
+                else:
+                    raise ValueError("Invalid data structure. Options are 'matrix' or 'dict'")
+                xfmr_idx += 1
+                xfmr = self.dss.Transformers.Next()
+            
         self.__qsts_complete=True
 
     def get_system_deviations(self,granularity=900):
@@ -239,7 +328,7 @@ class DSS_Timeseries(model.DSS_Data):
     #  ######### native Opendss - monthly QSTS #########
     #  #################################################
 
-    def initialize_qsts_duty(self, monitor_loads=True, verbose=False):
+    def initialize_qsts_duty(self, monitor_loads=False, verbose=False):
         """
         Initialize a duty-mode Quasi-Static Time Series simulation.
 
