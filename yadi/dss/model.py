@@ -55,6 +55,7 @@ class DSS_Data:
             self.redirects = redirects
         for redirect in self.redirects:
             self.redirect(redirect)
+            self.run_command('solve')
         if self.verbose:
             print(f'DSS Compiled Circuit: {self.dss.Circuit.Name()}')
     
@@ -206,11 +207,24 @@ class DSS_Data:
         Get static dictionary of all nodal complex power injections in the system at a single timestep
         """
         powers_dict = dict()
-        if(self.currents_dict == None or self.voltages_dict == None):
-            raise Exception('No internal currents dict or voltages dict found')
-        for node in self.dss.Circuit.YNodeOrder():
-            powers_dict[node] = self.voltages_dict[node]*np.conjugate(self.currents_dict[node]) #S=VI*
+        nodes = self.dss.Circuit.YNodeOrder()
+        volts = self.dss.Circuit.YNodeVArray()
+        currents = self.dss.Circuit.YCurrents()
+
+        #orange the current for testing
+        
+        # organize the phasors for dataset construction 
+        Volts = np.asarray(volts)
+        V = Volts[0::2] +  1j*Volts[1::2] # voltage phasors
+        Currents = np.asarray(currents) 
+        I = Currents[0::2] +  1j*Currents[1::2] # current phasors 
+        S = V*np.conjugate(I) # S=VI* complex power
+
+        for i, node in enumerate(nodes):
+            powers_dict[node] = S[i]
+        
         self.powers_dict = powers_dict
+        
         return powers_dict
 
 
@@ -464,8 +478,6 @@ class DSS_Data:
         warnings.warn("This method is not yet implemented, doing nothing.")
         pass
         #-----
-
-
         term_idx = {} # dictionary of dictionaries of phase currents for each terminal
         for term_idx in range(num_terminals): #terminal index (0,1)
             phase_currents = {} # dictionary of currents by phase for the current terminal terminal
