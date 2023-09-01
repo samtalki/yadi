@@ -26,7 +26,11 @@ class DSS_Data:
     Data class for OpenDSS network models.
     """
 
-    def __init__(self, redirects, verbose=True):
+    def __init__(
+            self, 
+            redirects, 
+            verbose=True, 
+            precompile=True):
         """
         Initializes an OpenDSS network model. 
         
@@ -35,9 +39,15 @@ class DSS_Data:
             - verbose (boolean): whether or not to print verbose logs
         """
         self.dss = dss #dss object
+
+        #initialize the redirects
+        if not isinstance(redirects, list):
+            self.redirects = [redirects]
+        else:
+            self.redirects = redirects
+
         # Initialize model attributes 
         self.verbose=verbose
-        self.redirects = None
         self.Y_net = None #internal ybus
         self.currents_dict = dict() #Internal (nodal current injections) currents_dict (static) at a single timestep
         self.voltages_dict = dict() #Internal voltages_dict (static) at a single timestep
@@ -45,17 +55,17 @@ class DSS_Data:
         self.line_currents_dict = dict() #Internal line currents dict (static) at a single timestep
         self.xfmer_currents_dict = dict() #Internal transformer currents dict (static) at a single timestep
         #Compile all redirect files
-        self.compile_dss(redirects)
+        self.num_compilations = 0
+        if precompile:
+            self.compile_dss()
+        
 
-    def compile_dss(self,redirects):
+    def compile_dss(self):
         """Compiles the DSS redirect files input into the object"""
-        if not isinstance(redirects, list):
-            self.redirects = [redirects]
-        else:
-            self.redirects = redirects
         for redirect in self.redirects:
             self.redirect(redirect)
             self.run_command('solve')
+        self.num_compilations += 1
         if self.verbose:
             print(f'DSS Compiled Circuit: {self.dss.Circuit.Name()}')
     
@@ -279,10 +289,11 @@ class DSS_Data:
             -NodeOrder: Array of integer containing the node numbers (representing phases, for example) for each conductor of each terminal.
         """
         data_lines = {}
-        names_lines = self.dss.Lines.AllNames()
+        # names_lines = self.dss.Lines.AllNames() ## NOTE: dss.Line.AllNames() is deprecated due to a bug in OpenDSS. Use dss.Lines.Name() in iteration instead.
         line_idx,line = 0,self.dss.Lines.First()
         while line:
-            name_line = names_lines[line_idx] #get name of line
+            ## NOTE: Deprecated code here: names_lines[line_idx] #get name of line
+            name_line = self.dss.Lines.Name() 
             # Get line data
             line_data = {
                 'BusNames': self.dss.CktElement.BusNames(),
@@ -303,10 +314,11 @@ class DSS_Data:
         Returns a dictionary of the nominal and emergency ratings for each line.
         """
         ratings_lines = {}
-        names_lines = self.dss.Lines.AllNames()
+        #names_lines = self.dss.Lines.AllNames() ##NOTE: Deprecated
         line_idx,line = 0,self.dss.Lines.First()
         while line:
-            name_line = names_lines[line_idx]
+            #name_line = names_lines[line_idx] ##NOTE: Deprecated
+            name_line = self.dss.Lines.Name()
             # Get line ratings
             line_ratings = {
                 'NormAmps': self.dss.Lines.NormAmps(), #normal ampere rating
@@ -339,11 +351,12 @@ class DSS_Data:
         """
         
         network_line_currents = {}
-        names_lines = self.dss.Lines.AllNames()
+        #names_lines = self.dss.Lines.AllNames() ##NOTE: Deprecated
         line_idx,line = 0,self.dss.Lines.First()
 
         while line: #iterate over lines
-            line_label = names_lines[line_idx] #get name of line
+            #line_label = names_lines[line_idx] #get name of line ##NOTE: Deprecated
+            line_label = self.dss.Lines.Name()
             R2n_line_currents = np.asarray(self.dss.CktElement.Currents()) #get line currents at this line (dimensionality R^{2n})
             line_currents = R2n_line_currents[0::2] + 1j*R2n_line_currents[1::2] #convert to complex
             num_terminals = self.dss.CktElement.NumTerminals() #get number of terminals
@@ -390,10 +403,11 @@ class DSS_Data:
             - include_neutral : Bool - whether or not to include the neutral phase in the extracted currents. Defaults to true.
         """
         network_xfmr_currents = {}
-        names_xfmrs = self.dss.Transformers.AllNames()
+        # names_xfmrs = self.dss.Transformers.AllNames()
         xfmr_idx,xfmr = 0,self.dss.Transformers.First()
         while xfmr:
-            xfmr_label = names_xfmrs[xfmr_idx] #get name of xfmr
+            #NOTE: Deprecated  xfmr_label = names_xfmrs[xfmr_idx] #get name of xfmr
+            xfmr_label = self.dss.Transformers.Name()
             # get the transformer phase currents --- note that this includes a subset of {a,b,c} and {0}, where {0} is the neutral
             R2n_xfmr_currents = np.asarray(self.dss.CktElement.Currents()) #get line currents at this line (dimensionality R^{2n})
             xfmr_currents = R2n_xfmr_currents[0::2] + 1j*R2n_xfmr_currents[1::2] #convert to complex
