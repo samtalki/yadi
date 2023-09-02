@@ -328,6 +328,29 @@ class DSS_Data:
             line = self.dss.Lines.Next() #increment line
             line_idx += 1 #increment index
         return ratings_lines
+    
+    def get_conductor_ratings(self):
+        """
+        Gets the single phase conductor ratings, in a vector format
+        """
+        nodal_line_limits = []
+        line_idx,line = 0,self.dss.Lines.First()
+        while line: #iterate over lines
+            line_label = self.dss.Lines.Name()
+            num_conductors = self.dss.CktElement.NumConductors() #get number of phases
+            num_phases = self.dss.CktElement.NumPhases()
+            if num_conductors != num_phases:
+                warnings.warn("The number of conductors is not equal to the number of phases. This may cause issues.")
+                n_ph = np.min([num_conductors,num_phases])
+            else:
+                n_ph = num_phases
+            three_ph_norm_amps = self.dss.Lines.NormAmps() #get the three phase normal amps
+            for i in range(n_ph):#apply normal amps per phase 
+                nodal_line_limits.append(three_ph_norm_amps)
+            line= self.dss.Lines.Next()
+        return np.asarray(nodal_line_limits)
+
+        
 
     def get_line_currents(self,structure="matrix"):
         """
