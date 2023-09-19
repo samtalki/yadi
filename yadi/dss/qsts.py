@@ -25,6 +25,8 @@ class DSS_Timeseries(model.DSS_Data):
             redirects,
             time_step,
             simulation_steps,
+            simulation_mode='duty',
+            simulation_controlmode='static',
             data_structure='matrix', # 'matrix' or 'dict'
             flow_direction='from', # 'from' or 'to'
             verbose=True,
@@ -44,8 +46,14 @@ class DSS_Timeseries(model.DSS_Data):
             - per_unit (boolean): whether or not to return per unit values at all times (default is False) #TODO
         """
         super().__init__(redirects,precompile=precompile)
+
+        #--- Simulation parameters ---#
         self.time_step = time_step
         self.simulation_steps = simulation_steps
+        self.simulation_mode=simulation_mode
+        self.simulation_controlmode=simulation_controlmode
+
+        #---- Data structure and flow direction ----#
         self.data_structure = data_structure
         self.flow_direction = flow_direction
         self.verbose = verbose
@@ -99,7 +107,7 @@ class DSS_Timeseries(model.DSS_Data):
         #Check QSTS initialization
         #self.__check_qsts_initialization()
         self.compile_dss()
-        self.initialize_qsts_duty()
+        self.initialize_qsts()
 
         # All electircal nodes in the system - includes all individual conductors/phases
         nodes = self.dss.Circuit.YNodeOrder()
@@ -335,19 +343,19 @@ class DSS_Timeseries(model.DSS_Data):
         if(not self.__qsts_initialized):
             warnings.warn("QSTS has not been initialized. Initiailizing before run.")
             self.compile_dss(self.redirects)
-            self.initialize_qsts_duty()
+            self.initialize_qsts()
         elif(self.__qsts_complete):
             warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
             self.compile_dss(self.redirects)
-            self.initialize_qsts_duty()
+            self.initialize_qsts()
 
     #  #################################################
     #  ######### native Opendss - monthly QSTS #########
     #  #################################################
 
-    def initialize_qsts_duty(self, monitor_loads=False, verbose=False):
+    def initialize_qsts(self, monitor_loads=False, verbose=False):
         """
-        Initialize a duty-mode Quasi-Static Time Series simulation.
+        Initialize a chosen-mode Quasi-Static Time Series simulation.
 
         Params:
             monitor_loads (boolean): Whether or not to set monitors on all loads.
@@ -358,10 +366,10 @@ class DSS_Timeseries(model.DSS_Data):
         if(monitor_loads):
             self.__set_monitor_all_loads(verbose=verbose)
         errs.append(
-            self.dss.run_command('Set controlmode=static')
+            self.dss.run_command(f'Set controlmode={self.simulation_controlmode}')
         )
         errs.append(
-            self.dss.run_command("Set mode=duty "
+            self.dss.run_command(f"Set mode={self.simulation_mode} "
                                  f"number={self.simulation_steps} "
                                  f"stepsize={self.time_step}")
         )
