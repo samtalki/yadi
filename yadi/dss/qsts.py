@@ -27,6 +27,10 @@ class DSS_Timeseries(model.DSS_Data):
             simulation_steps,
             simulation_mode='duty',
             simulation_controlmode='static',
+            maxcontroliter=50,
+            miniterations=1,
+            maxiterations=25,
+            solution_number=1, 
             data_structure='matrix', # 'matrix' or 'dict'
             flow_direction='from', # 'from' or 'to'
             verbose=True,
@@ -49,9 +53,13 @@ class DSS_Timeseries(model.DSS_Data):
 
         #--- Simulation parameters ---#
         self.time_step = time_step
-        self.simulation_steps = simulation_steps
+        self.simulation_steps = simulation_steps # Number of simulation steps (iterations) to run in the QSTS simulation
         self.simulation_mode=simulation_mode
         self.simulation_controlmode=simulation_controlmode
+        self.maxcontroliter = maxcontroliter
+        self.miniterations = miniterations
+        self.maxiterations = maxiterations
+        self.solution_number = solution_number #the number of solutions to find at each call of the solve command (iteraiton)
 
         #---- Data structure and flow direction ----#
         self.data_structure = data_structure
@@ -370,8 +378,12 @@ class DSS_Timeseries(model.DSS_Data):
         )
         errs.append(
             self.dss.run_command(f"Set mode={self.simulation_mode} "
-                                 f"number={self.simulation_steps} "
-                                 f"stepsize={self.time_step}")
+                                 f"number={self.solution_number} "
+                                 f"stepsize={self.time_step} "
+                                 f"maxcontroliter={self.maxcontroliter} "
+                                 f"maxiterations={self.maxiterations} "
+                                 f"miniterations={self.miniterations} "
+                                 )
         )
         errs.append(
             self.dss.run_command('Set maxcontroliter=600')
