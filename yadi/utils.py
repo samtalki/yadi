@@ -1,5 +1,4 @@
 import yadi.data.ami as ami
-import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('fivethirtyeight')
@@ -48,6 +47,32 @@ def plot_results(HC_1,HC_2,baseline):
         axes[0].legend()
         axes[1].legend() 
 
+
+### Spectral Analysis
+def spectral_analysis(S):
+    """Computes normalized and commulative spectral analysis for a given matrix with the SVD"""
+    u,sigma,vt = np.linalg.svd(S)
+    sigma_total = np.sum(sigma)
+    normed_sigma = sigma/sigma_total
+    cum_sigma = np.cumsum(normed_sigma)
+    return cum_sigma,normed_sigma
+
+def plot_spectral_analysis(S):
+    """Plots the normalized and cummulative spectral analysis for a given matrix S"""
+    cum_sigma,normed_sigma = spectral_analysis(S)
+    fig,axes = plt.subplots(constrained_layout=True,figsize=(3.5*2,3.5*2/1.61828),ncols=2)
+    axes[0].plot(normed_sigma,'o')
+    axes[1].plot(cum_sigma,'o')
+    axes[0].set_title('Normalized Singular Values')
+    axes[1].set_title('Cumulative Singular Values')
+    axes[0].set_xlabel('Singular Value Index')
+    axes[1].set_xlabel('Singular Value Index')
+    axes[0].set_ylabel('Normalized Singular Value')
+    axes[1].set_ylabel('Cumulative Singular Value')
+    return fig,axes
+
+
+
 def load_data(data_path):
     AMI = ami.AMIData(data_path=data_path)
     data,day_data = AMI.get_datasets(),AMI.get_daytime_datasets()
@@ -75,8 +100,8 @@ def fdiff(A,norm=1):
         norm: the amount to normalize A(k+1)-A(k) by
     """
     (M,N) = A.shape
-    DA = jnp.divide(
-        jnp.diff(A,axis=0),
+    DA = np.divide(
+        np.diff(A,axis=0),
         norm)
     assert DA.shape == (M-1,N)
     return DA

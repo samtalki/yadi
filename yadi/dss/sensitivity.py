@@ -13,15 +13,24 @@ import pandas as pd
 import os
 import warnings
 
-class DSS_Sensitivities(model.DSS_Model):
+class DSS_Sensitivities(model.DSS_Data):
 
-    def __init__(self,redirects,verbose=True):
+    def __init__(self,redirects,verbose=True,per_unit=True):
+        """
+        Sensitivity model for OpenDSS networks. Uses the "perturb and obseve" technique.
+        Inherits from the DSS_Data class.
+        Parameters:
+            - redirects (list): List of strings of filepaths to .dss files
+            - verbose (boolean): whether or not to print verbose logs
+            - per_unit (boolean): whether or not to return per unit sensitivities
+        """
         super().__init__(redirects)
         self.spv = None #sensitivity of vmag wrt active power
         self.sqv = None #sensitivity of vmag wrt reactive power
         self.spth = None #sensitivity of angles wrt active power
         self.sqth = None #sensitivity of angles wrt reactive power
         self.verbose = verbose #error throwing setting
+        self.per_unit = per_unit
 
 
     def get_svp(self):
@@ -97,10 +106,15 @@ class DSS_Sensitivities(model.DSS_Model):
         nodes = self.dss.Circuit.YNodeOrder()
         #print("nodes for the circuit: ",nodes)
         
-        #Get the ybus-ordered array of phase voltages (basecase)
-        vph_base = self.get_node_voltages()
-        vph_base_yorder = [vph_base[i] for i in nodes]
-        #print('Voltages basecase: ',vph_base)   
+        #Get the ybus-ordered array of phase voltages (base case v0)
+        if self.per_unit: # per unit voltages
+            vph_base = self.get_node_voltages_mag_pu()
+            vph_base_yorder = [vph_base[i] for i in nodes]
+            #print('Voltages basecase: ',vph_base)
+        else: # actual voltages
+            vph_base = self.get_node_voltages()
+            vph_base_yorder = [vph_base[i] for i in nodes]
+            #print('Voltages basecase: ',vph_base)   
         
         #Iteratively solve the injections and retrieve the voltages 
         S_matrix = np.zeros((len(nodes),len(nodes)))
@@ -108,7 +122,6 @@ class DSS_Sensitivities(model.DSS_Model):
         for col_idx, node in enumerate(nodes):
             if(self.verbose):
                 print("Node Perturbed: ",node)
-            
             if(dep_var=="P" or dep_var=='p'):
                 #Get a dictionary of voltages after active power perturbation
                 vph_perturbed = self.__get_perturbed_nodal_voltages(bus_name=node,phases=1,kw_inj=-100,kvar_inj=0)
@@ -122,9 +135,9 @@ class DSS_Sensitivities(model.DSS_Model):
                 raise Exception('Invalid dependent variable')
 
             if(indp_var == 'vmag'): #Vmag sensitivities
-                S_matrix[:,col_idx] = (np.abs(np.asarray(vph_perturbed_yorder))-np.abs(np.asarray(vph_base_yorder)))/(100*100)
+                S_matrix[:,col_idx] = (np.abs(np.asarray(vph_perturbed_yorder))-np.abs(np.asarray(vph_base_yorder)))/(100)
             elif(indp_var == 'theta'): #Angle sensitivities
-                S_matrix[:,col_idx] = (np.angle(np.asarray(vph_perturbed_yorder))-np.angle(np.asarray(vph_base_yorder)))/(100*100)
+                S_matrix[:,col_idx] = (np.angle(np.asarray(vph_perturbed_yorder))-np.angle(np.asarray(vph_base_yorder)))/(100)
             else:
                 raise Exception("Invalid independent variable")
         
@@ -151,7 +164,10 @@ class DSS_Sensitivities(model.DSS_Model):
         self.dss.run_command('Set Controlmode = STATIC')
         self.__set_perturbed_injection(bus_name,phases,kw_inj,kvar_inj)
         self.dss.run_command('solve')
-        return self.get_node_voltages()
+        if self.per_unit:
+            return self.get_node_voltages_mag_pu()
+        else:
+            return self.get_node_voltages()
 
 
     def __set_perturbed_injection(self,bus_name,phases,kw_inj,kvar_inj):

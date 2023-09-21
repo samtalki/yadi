@@ -1,1 +1,4 @@
 env/*
+.vscode/*
+yadi/__pycache__/
+yadi/dss/__pycache__/
