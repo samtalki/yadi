@@ -327,11 +327,11 @@ class DSS_Timeseries(model.DSS_Data):
          #Check to see if QSTS is initialized
         if(not self.__qsts_initialized):
             warnings.warn("QSTS has not been initialized. Initiailizing before run.")
-            self.compile_dss(self.redirects)
+            self.compile_dss()
             self.initialize_qsts()
         elif(self.__qsts_complete):
             # warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
-            self.compile_dss(self.redirects)
+            self.compile_dss()
             self.initialize_qsts()
 
     #  #################################################
@@ -402,7 +402,7 @@ class DSS_Timeseries(model.DSS_Data):
                 thermalLimitDict[line] = self.dss.Lines.NormAmps()
         return pd.Series(thermalLimitDict)
 
-    def initialize_qsts_duty(self, monitor_trafos=True, monitor_lines=True, monitor_loads=True, verbose=False):
+    def initialize_qsts(self, monitor_trafos=True, monitor_lines=True, monitor_loads=True, verbose=False):
         """
         Initialize a chosen-mode Quasi-Static Time Series simulation.
 
@@ -618,7 +618,7 @@ class DSS_Timeseries(model.DSS_Data):
         self.__check_qsts_initialization()
         # Run Duty mode qsts
         # whole duty
-        self.dss.run_command('solve')
+        self.dss.Text.Command('solve')
         voltage_profiles, kw_profiles, kvar_profiles = self.__get_monitor_all_loads()
         lineIjk, linePjk, lineQjk = self.__get_monitor_all_lines()
         trafoIjk, trafoPjk, trafoQjk = self.__get_monitor_all_trafos()
