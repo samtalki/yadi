@@ -1,5 +1,5 @@
 """
-OpenDSS Quasi-Static Time Series Simulation Data Structure
+OpenDSS Quasi-Static Time Series Simulation Time Series Structure
 @author: Samuel Talkington
 MIT License
 October 6th, 2021
@@ -9,7 +9,7 @@ October 6th, 2021
 from tkinter import W
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.load_shape as load_shape 
+import yadi.yadi.dss.voltage_source as voltage_source 
 import warnings
 from tqdm import tqdm
 import pathlib
@@ -18,7 +18,7 @@ import os
 #Optional: Turn off complex value warnings
 #warnings.simplefilter("ignore", np.ComplexWarning)
 
-class DSS_Timeseries(load_shape.DSS_LoadShape):
+class DSS_Timeseries(voltage_source.DSS_VoltageSource):
 
     def __init__(
             self,
@@ -295,70 +295,6 @@ class DSS_Timeseries(load_shape.DSS_LoadShape):
     #  ######### native Opendss QSTS #########
     #  #################################################
 
-    def get_loadBusAndVln(self):
-        "Method to extract load buses from a feeder"
-        loadBusDict = dict()
-        loadVlnDict = dict()
-        loads = self.dss.Loads.AllNames()
-        for load in loads:
-            # set load as active
-            self.dss.Loads.Name(load)
-            # name = self.dss.CktElement.Name()  # sanity check
-            # get bus name
-            buses = self.dss.CktElement.BusNames()
-            bus = buses[0]
-            # save name
-            loadBusDict[load] = bus
-            loadVlnDict[load] = self.dss.Loads.kV()
-        return pd.Series(loadBusDict), pd.Series(loadVlnDict)
-
-    def get_trafoEAmps(self):
-        "Method to extract transformers emergency amps"
-        trafos = self.dss.Transformers.AllNames()
-        thermalLimitDict = dict()
-        for trafo in trafos:
-            self.dss.Transformers.Name(trafo)
-            # name = self.dss.CktElement.Name()  # sanity check
-            thermalLimitDict[trafo] = self.dss.CktElement.NormalAmps()
-        return pd.Series(thermalLimitDict)
-
-    def get_trafoPerPhaseEAmps(self):
-        "Method to extract transformers emergency amps"
-        trafos = self.dss.Transformers.AllNames()
-        thermalLimitDict = dict()
-        for trafo in trafos:
-            self.dss.Transformers.Name(trafo)
-            phases = self.dss.CktElement.NumPhases()
-            if phases > 1:
-                for ph in range(phases):
-                    thermalLimitDict[trafo + f".{ph + 1}"] = self.dss.CktElement.NormalAmps()
-            else:
-                thermalLimitDict[trafo] = self.dss.CktElement.NormalAmps()
-        return pd.Series(thermalLimitDict)
-
-    def get_lineEAmps(self):
-        "Method to extract line emergency amps"
-        lines = self.dss.Lines.AllNames()
-        thermalLimitDict = dict()
-        for line in lines:
-            self.dss.Lines.Name(line)
-            thermalLimitDict[line] = self.dss.Lines.NormAmps()
-        return pd.Series(thermalLimitDict)
-
-    def get_linePerPhaseEAmps(self):
-        "Method to extract line emergency amps"
-        lines = self.dss.Lines.AllNames()
-        thermalLimitDict = dict()
-        for line in lines:
-            self.dss.Lines.Name(line)
-            phases = self.dss.Lines.Phases()
-            if phases > 1:
-                for ph in range(phases):
-                    thermalLimitDict[line + f".{ph + 1}"] = self.dss.Lines.NormAmps()
-            else:
-                thermalLimitDict[line] = self.dss.Lines.NormAmps()
-        return pd.Series(thermalLimitDict)
-
     def initialize_qsts(self, native, verbose=False):
         """
         Initialize a chosen-mode Quasi-Static Time Series simulation.
@@ -398,12 +334,11 @@ class DSS_Timeseries(load_shape.DSS_LoadShape):
 
     def run_native_qsts(self, userDemand=None):
         """
-        Compute monthly voltage, active, and reactive power timeseries dictionary for a single node i in the system:
-        D_i = {(V_i,t,P_i,t,Q_i,t)}_{t=1,..,M} for all i
+        runs a native QSTS simulation from OpenDSS.
 
         Parameters:
         ---
-            month: {01-jan, 02-feb, ....}
+            userDemand: 
         """
         if userDemand is not None:
             self.setAllLoadShapes(userDemand[0], userDemand[1])
@@ -421,7 +356,7 @@ class DSS_Timeseries(load_shape.DSS_LoadShape):
         # Run Duty mode qsts
         self.dss.Text.Command('solve')
 
-        # whole duty
+        # get monitor information
         voltage_profiles, kw_profiles, kvar_profiles = self.get_monitor_all_loads()
         lineIjk, linePjk, lineQjk = self.get_monitor_all_lines()
         trafoIjk, trafoPjk, trafoQjk = self.get_monitor_all_trafos()
