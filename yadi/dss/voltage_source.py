@@ -12,5 +12,4 @@ class DSS_VoltageSource(line_code.DSS_LineCode):
         Class for handling voltage sources in OpenDSS.
 
         """
-
         super().__init__(redirects, redirects, precompile)

@@ -72,7 +72,8 @@ class DSS_Data:
     @staticmethod
     def run_command(cmd):
         """Runs any string command"""
-        status = dss.run_command(cmd)
+        # status = dss.run_command(cmd)
+        status = dss.Text.Command(cmd)
         if status:
             print(f'DSS Status ({cmd}): {status}')
 
@@ -247,16 +248,16 @@ class DSS_Data:
             self.__initialization()
 
         # initialize OpenDSS solver
-        self.dss.run_command("solve")
+        self.run_command("solve")
 
         # extract the voltages from the initial setup
         vtd = self.get_node_voltages()
                 
         # required to obtain the Ybus without load and generators equivalents
-        self.dss.run_command("vsource.source.enabled=no")
-        #self.dss.run_command("batchedit load..* enabled=no")
-        #self.dss.run_command("batchedit transformer..* enabled=no")
-        self.dss.run_command("solve")
+        self.run_command("vsource.source.enabled=no")
+        #self.run_command("batchedit load..* enabled=no")
+        #self.run_command("batchedit transformer..* enabled=no")
+        self.run_command("solve")
         
         nodes = self.dss.Circuit.YNodeOrder()
         
@@ -290,7 +291,7 @@ class DSS_Data:
         """
         data_lines = {}
         # names_lines = self.dss.Lines.AllNames() ## NOTE: dss.Line.AllNames() is deprecated due to a bug in OpenDSS. Use dss.Lines.Name() in iteration instead.
-        line_idx,line = 0,self.dss.Lines.First()
+        line_idx, line = 0, self.dss.Lines.First()
         while line:
             ## NOTE: Deprecated code here: names_lines[line_idx] #get name of line
             name_line = self.dss.Lines.Name() 
@@ -315,7 +316,7 @@ class DSS_Data:
         """
         ratings_lines = {}
         #names_lines = self.dss.Lines.AllNames() ##NOTE: Deprecated
-        line_idx,line = 0,self.dss.Lines.First()
+        line_idx, line = 0, self.dss.Lines.First()
         while line:
             #name_line = names_lines[line_idx] ##NOTE: Deprecated
             name_line = self.dss.Lines.Name()
@@ -334,7 +335,7 @@ class DSS_Data:
         Gets the single phase conductor ratings, in a vector format
         """
         nodal_line_limits = []
-        line_idx,line = 0,self.dss.Lines.First()
+        line_idx, line = 0, self.dss.Lines.First()
         while line: #iterate over lines
             line_label = self.dss.Lines.Name()
             num_conductors = self.dss.CktElement.NumConductors() #get number of phases
@@ -351,7 +352,6 @@ class DSS_Data:
         return np.asarray(nodal_line_limits)
 
         
-
     def get_line_currents(self,structure="matrix"):
         """
         Gets the lines currents in the system at the current timestep/solution. 
@@ -375,7 +375,7 @@ class DSS_Data:
         
         network_line_currents = {}
         #names_lines = self.dss.Lines.AllNames() ##NOTE: Deprecated
-        line_idx,line = 0,self.dss.Lines.First()
+        line_idx, line = 0, self.dss.Lines.First()
 
         while line: #iterate over lines
             #line_label = names_lines[line_idx] #get name of line ##NOTE: Deprecated
@@ -507,7 +507,7 @@ class DSS_Data:
         return data_xfmrs
 
     #TODO: add a method to get the line and xfmr conductor+phase labels to conductor index
-    def get_xfmr_conductor_idx_map(self,flow_direction,include_neutral=True):
+    def get_xfmr_conductor_idx_map(self, flow_direction, include_neutral=True):
         """
         Makes a nested dictionary mapping the conductor terminal->phase->conductor index.
         """
@@ -549,6 +549,6 @@ class DSS_Data:
     def __initialization(self):
         """Initializies basic DSS parameters"""
         # set maxiterations number
-        self.dss.run_command("Set Maxiterations=600")
+        self.run_command("Set Maxiterations=600")
         # disable the default regulator
-        self.dss.run_command("Set controlmode=Off") 
+        self.run_command("Set controlmode=Off") 

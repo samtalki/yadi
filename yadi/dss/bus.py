@@ -13,20 +13,41 @@ class DSS_Bus(load_shape.DSS_LoadShape):
         """
 
         super().__init__(redirects, redirects, precompile)
+    
+    def write_PMD_bus(self):
 
-    def get_loadBusAndVln(self):
-        "Method to extract load buses from a feeder"
-        loadBusDict = dict()
-        loadVlnDict = dict()
-        loads = self.dss.Loads.AllNames()
-        for load in loads:
-            # set load as active
-            self.dss.Loads.Name(load)
-            # name = self.dss.CktElement.Name()  # sanity check
-            # get bus name
-            buses = self.dss.CktElement.BusNames()
-            bus = buses[0]
-            # save name
-            loadBusDict[load] = bus
-            loadVlnDict[load] = self.dss.Loads.kV()
-        return pd.Series(loadBusDict), pd.Series(loadVlnDict)
+        # initialize bus structure
+        self.bus = {}
+
+        # get all bus names
+        bus_names = self.dss.Circuit.AllBusNames()
+
+        # main loop
+        for bn in bus_names:
+
+            # set bus as active
+            self.dss.Circuit.SetActiveBus(bn)
+
+            # get bus nodes/terminals
+            terminals = self.dss.Bus.Nodes()
+
+            # if bus has more than 4 nodes, assume node 4 is grounded
+            if len(terminals) > 4:
+                grounded = [4]
+                rg = [0.0]
+                xg = [0.0]
+            else:
+                grounded = []
+                rg = []
+                xg = []
+
+            # create structure
+            self.bus[bn] = {
+            "terminals"   : terminals,
+            "grounded"    : grounded,
+            "rg"          : rg,
+            "xg"          : xg,
+            "status"      : "ENABLED",
+            "time_series" : {},
+            }
+

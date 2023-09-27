@@ -376,3 +376,28 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         self.trafoIjks = trafoIjk
         self.trafoPjks = trafoPjk
         self.trafoQjk = trafoQjk
+
+    #  ##############################################################
+    #  ######### Write Power Models Distribution dictionary #########
+    #  ##############################################################
+    def write_PMD(self):
+
+        # check if QSTS has been run
+        if not self.__qsts_complete:
+            self.run_native_qsts()
+
+        # create dictionary
+        time_series = {}
+
+        # (1) bus
+        time_series["bus"] = None 
+
+        # (2) line
+        time_series["line"] = None
+
+        # (3) transformer
+        time_series["transformer"] = None 
+
+        # (4) load
+        time_series["load"] = None
+

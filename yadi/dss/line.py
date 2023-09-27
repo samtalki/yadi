@@ -15,6 +15,60 @@ class DSS_Line(bus.DSS_Bus):
 
         super().__init__(redirects, redirects, precompile)
 
+    def write_PMD_line(self):
+
+        # initialize line structure
+        self.line = {}
+
+        # get all bus names
+        line_names = self.dss.Lines.AllNames()
+
+        # main loop
+        for ln in line_names:
+
+            # set line as active
+            self.dss.Lines.Name(ln)
+
+            # buses
+            f_bus = self.dss.Lines.Bus1
+            t_bus = self.dss.Lines.Bus2
+
+            if not "sw" in ln:
+                # create structure
+                self.line[ln] = {
+                    "f_bus"         : f_bus,
+                    "t_bus"         : t_bus,
+                    "f_connections" : self.bus[f_bus]["terminals"],
+                    "t_connections" : self.bus[t_bus]["terminals"],
+                    "linecode"      : self.dss.Lines.LineCode(),
+                    "length"        : self.dss.Lines.Length(),
+                    "source_id"     : f"line.{ln}",
+                    "status"        : "ENABLED",
+                    "time_series"   : {},
+                }
+            else:
+
+                rs = self.dss.Lines.RMatrix()
+                xs = self.dss.Lines.XMatrix()
+
+                # create structure
+                self.line[ln] = {
+                    "f_bus"         : f_bus,
+                    "t_bus"         : t_bus,
+                    "f_connections" : self.bus[f_bus]["terminals"],
+                    "t_connections" : self.bus[t_bus]["terminals"],
+                    "rs"            : rs,
+                    "xs"            : xs,
+                    "g_fr"          : np.zeros_like(rs),
+                    "b_fr"          : np.zeros_like(rs),
+                    "g_to"          : np.zeros_like(rs),
+                    "b_to"          : np.zeros_like(rs),
+                    "length"        : self.dss.Lines.Length(),
+                    "source_id"     : f"line.{ln}",
+                    "status"        : "ENABLED",
+                    "time_series"   : {},
+                }
+
     def get_lineEAmps(self):
         "Method to extract line emergency amps"
         lines = self.dss.Lines.AllNames()
