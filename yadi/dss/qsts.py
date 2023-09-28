@@ -86,16 +86,59 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         self.__qsts_initialized = False
         self.__qsts_complete = False
     
-    def get_node_qsts_df(self,node):
+    def __check_qsts_initialization(self, native=False):
+        """Check if QSTS has been properly initialized"""
+         #Check to see if QSTS is initialized
+        if(not self.__qsts_initialized):
+            warnings.warn("QSTS has not been initialized. Initiailizing before run.")
+            self.compile_dss()
+            self.initialize_qsts(native)
+
+        elif(self.__qsts_complete):
+            # warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
+            self.compile_dss()
+            self.initialize_qsts(native)
+
+    def initialize_qsts(self, native, verbose=False):
         """
-        Gets the MVTS DF at a specific node
+        Initialize a chosen-mode Quasi-Static Time Series simulation.
+
+        Params:
+            monitor_loads (boolean): Whether or not to set monitors on all loads.
+
         """
-        if(self.nodal_mvts_dfs is None):
-            warnings.warn("QSTS has not been run yet, running...")
-            self.run()
-            return self.nodal_mvts_dfs[node]
+        errs = []
+
+        if(native):
+            number = self.simulation_steps
+
+            self.set_monitor_all_loads(verbose=verbose)
+
+            self.set_monitor_all_lines(verbose=verbose)
+
+            self.set_monitor_all_trafos(verbose=verbose)
         else:
-            return self.nodal_mvts_dfs[node]
+            number = self.solution_number
+
+        errs.append(
+            self.dss.run_command(f'Set controlmode={self.simulation_controlmode}')
+        )
+        errs.append(
+            self.dss.run_command(f"Set mode={self.simulation_mode} "
+                                 f"number={number} "
+                                 f"stepsize={self.time_step} "
+                                 f"maxcontroliter={self.maxcontroliter} "
+                                 f"maxiterations={self.maxiterations} "
+                                 f"miniterations={self.miniterations} "
+                                 )
+        )
+
+        # print('QSTS Initialized, Returned: ', [err for err in errs])
+        self.__qsts_initialized = True
+
+    #  #################################################
+    #  ######### run net node injection QSTS #########
+    #  #################################################
 
     def run(self):
         """
@@ -140,7 +183,8 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
     #TODO: Enable no-neutral xfmr currents
     def __run_qsts_duty(self,nodes,n_nodes):
         """
-        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage phasors, complex powers, and currents, for each node
+        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataset of 
+        voltage phasors, complex powers, and currents, for each node
         """
         # Get the names of all lines and transformers, 
         names_lines = self.dss.Lines.AllNames()
@@ -168,7 +212,7 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         tot_cond_lines = np.sum(n_cond_lines)
         tot_cond_xfmrs = np.sum(n_cond_xfmrs)
 
-        #Set internal fields for the data structure
+        # Set internal fields for the data structure
         self.voltages_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
         self.vmags_pu_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.double) #voltage magnitude multivariate timeseries array MxN
         self.complex_powers_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
@@ -238,6 +282,17 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
             
         self.__qsts_complete=True
 
+    def get_node_qsts_df(self,node):
+        """
+        Gets the MVTS DF at a specific node
+        """
+        if(self.nodal_mvts_dfs is None):
+            warnings.warn("QSTS has not been run yet, running...")
+            self.run()
+            return self.nodal_mvts_dfs[node]
+        else:
+            return self.nodal_mvts_dfs[node]
+
     def get_system_deviations(self,granularity=900):
         """
         Construct multivariate timeseries datasets of finite differences of:
@@ -278,59 +333,10 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         }
         return D_diff_N
 
-    def __check_qsts_initialization(self, native=False):
-        """Check if QSTS has been properly initialized"""
-         #Check to see if QSTS is initialized
-        if(not self.__qsts_initialized):
-            warnings.warn("QSTS has not been initialized. Initiailizing before run.")
-            self.compile_dss()
-            self.initialize_qsts(native)
-
-        elif(self.__qsts_complete):
-            # warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
-            self.compile_dss()
-            self.initialize_qsts(native)
 
     #  #################################################
-    #  ######### native Opendss QSTS #########
+    #  ######### run native OpenDSS QSTS #########
     #  #################################################
-
-    def initialize_qsts(self, native, verbose=False):
-        """
-        Initialize a chosen-mode Quasi-Static Time Series simulation.
-
-        Params:
-            monitor_loads (boolean): Whether or not to set monitors on all loads.
-
-        """
-        errs = []
-
-        if(native):
-            number = self.simulation_steps
-
-            self.set_monitor_all_loads(verbose=verbose)
-
-            self.set_monitor_all_lines(verbose=verbose)
-
-            self.set_monitor_all_trafos(verbose=verbose)
-        else:
-            number = self.solution_number
-
-        errs.append(
-            self.dss.run_command(f'Set controlmode={self.simulation_controlmode}')
-        )
-        errs.append(
-            self.dss.run_command(f"Set mode={self.simulation_mode} "
-                                 f"number={number} "
-                                 f"stepsize={self.time_step} "
-                                 f"maxcontroliter={self.maxcontroliter} "
-                                 f"maxiterations={self.maxiterations} "
-                                 f"miniterations={self.miniterations} "
-                                 )
-        )
-
-        # print('QSTS Initialized, Returned: ', [err for err in errs])
-        self.__qsts_initialized = True
 
     def run_native_qsts(self, userDemand=None):
         """
@@ -344,17 +350,18 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
             self.setAllLoadShapes(userDemand[0], userDemand[1])
 
         # run routine with modified loadShapes
-        self.__run_qsts_OpenDSS_duty()
+        self.__run_native_qsts_duty()
 
-    def __run_qsts_OpenDSS_duty(self):
+    def __run_native_qsts_duty(self):
         """
-        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage magnitudes, complex powers, and currents, for each node
+        Run a "Quasi-Static Time-Series" within OpenDSS and get multivariate 
+        timeseries a dataset of voltage magnitudes, complex powers, and currents based on Monitors.
         """
         # Check QSTS initialization
         self.__check_qsts_initialization(native=True)
 
         # Run Duty mode qsts
-        self.dss.Text.Command('solve')
+        self.run_command('solve')
 
         # get monitor information
         voltage_profiles, kw_profiles, kvar_profiles = self.get_monitor_all_loads()
@@ -377,27 +384,49 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         self.trafoPjks = trafoPjk
         self.trafoQjk = trafoQjk
 
-    #  ##############################################################
-    #  ######### Write Power Models Distribution dictionary #########
-    #  ##############################################################
-    def write_PMD(self):
+    #  ##########################################################
+    #  ######### run QSTS for Power Models Distribution #########
+    #  ##########################################################
 
-        # check if QSTS has been run
-        if not self.__qsts_complete:
-            self.run_native_qsts()
+    def run_PMD_qsts(self):
+        """
+        This method runs a python-based QSTS simulation for populating PMD time_series dictionary.
 
-        # create dictionary
-        time_series = {}
+        Parameters:
+        ---
+            dss: the dss object
+            element: name of the lement
 
-        # (1) bus
-        time_series["bus"] = None 
+        """
+        
+        # run routine with
+        self.__run_PMD_qsts_duty()
 
-        # (2) line
-        time_series["line"] = None
+    def __run_PMD_qsts_duty(self):
+        """
+        Run a "Quasi-Static Time-Series" simulation and populate a PMD dictionary 
+        comprising time_series data for each structure, i.e., voltage magnitudes 
+        for buses and active powers for lines, transformers, and loads.
+        """
 
-        # (3) transformer
-        time_series["transformer"] = None 
+        # Check QSTS initialization
+        self.__check_qsts_initialization()
 
-        # (4) load
-        time_series["load"] = None
+        # Create all structures
+        self.create_buses()
+        self.create_lines()
+        self.create_xfmrs()
+        self.create_loads()
+        
+        #Run Duty mode qsts
+        for it in tqdm (range (self.simulation_steps), desc="QSTS running..."):  
+            # run routine one set at a time
+            self.run_command('solve')
 
+            # get electrical quantities at time t
+            self.read_bus_voltages()
+            self.read_line_power()
+            self.read_xfmr_power()
+            self.read_load_power()
+
+        self.__qsts_complete=True

@@ -15,59 +15,68 @@ class DSS_Line(bus.DSS_Bus):
 
         super().__init__(redirects, redirects, precompile)
 
-    def write_PMD_line(self):
+    def create_lines(self):
 
-        # initialize line structure
-        self.line = {}
+        # initialize line container 
+        self.lines = [] 
 
-        # get all bus names
-        line_names = self.dss.Lines.AllNames()
+        # set first line as active 
+        self.dss.Lines.First()
 
-        # main loop
-        for ln in line_names:
-
+        while True:
             # set line as active
-            self.dss.Lines.Name(ln)
+            ln = self.dss.Lines.Name()
 
-            # buses
-            f_bus = self.dss.Lines.Bus1
-            t_bus = self.dss.Lines.Bus2
+            # from and to buses
+            f_bus = self.dss.Lines.Bus1()
+            t_bus = self.dss.Lines.Bus2()
 
-            if not "sw" in ln:
-                # create structure
-                self.line[ln] = {
-                    "f_bus"         : f_bus,
-                    "t_bus"         : t_bus,
-                    "f_connections" : self.bus[f_bus]["terminals"],
-                    "t_connections" : self.bus[t_bus]["terminals"],
-                    "linecode"      : self.dss.Lines.LineCode(),
-                    "length"        : self.dss.Lines.Length(),
-                    "source_id"     : f"line.{ln}",
-                    "status"        : "ENABLED",
-                    "time_series"   : {},
-                }
-            else:
+            # build dictionary with required data for visualization    
+            line = {
+                "uid": ln,
+                "f_bus": f_bus.split(".")[0],
+                "t_bus": t_bus.split(".")[0],
+            }
 
-                rs = self.dss.Lines.RMatrix()
-                xs = self.dss.Lines.XMatrix()
+            # get line phases
+            num_phases = self.dss.Lines.Phases()
 
-                # create structure
-                self.line[ln] = {
-                    "f_bus"         : f_bus,
-                    "t_bus"         : t_bus,
-                    "f_connections" : self.bus[f_bus]["terminals"],
-                    "t_connections" : self.bus[t_bus]["terminals"],
-                    "rs"            : rs,
-                    "xs"            : xs,
-                    "g_fr"          : np.zeros_like(rs),
-                    "b_fr"          : np.zeros_like(rs),
-                    "g_to"          : np.zeros_like(rs),
-                    "b_to"          : np.zeros_like(rs),
-                    "length"        : self.dss.Lines.Length(),
-                    "source_id"     : f"line.{ln}",
-                    "status"        : "ENABLED",
-                    "time_series"   : {},
-                }
+            # create voltage magnitude container for each line-terminal combination
+            for ph in range(num_phases):
+                line[f"p_ij.{ph+1}"] = []
+                line[f"p_ji.{ph+1}"] = []
+                line[f"q_ij.{ph+1}"] = []
+                line[f"q_ji.{ph+1}"] = []
+
+            # append to container
+            self.lines.append(line)
+
+            if not self.dss.Loads.Next() > 0:
+                break
+
+    def read_line_power(self):
+
+        for line in self.lines:
+
+            # get line uid
+            uid = line["uid"]
+
+            # set active line
+            self.dss.Circuit.SetActiveElement(f"Line.{uid}")
+
+            # get line active powers
+            p = self.dss.CktElement.Powers()[0::2]
+            q = self.dss.CktElement.Powers()[1::2]
+
+            # get line phases
+            num_phases = self.dss.Lines.Phases()
+
+            # create voltage magnitude container for each line-terminal combination
+            for ph in range(num_phases):
+                line[f"p_ij.{ph+1}"].append(p[ph]) 
+                line[f"p_ji.{ph+1}"].append(p[int(len(p)/2) + ph]) 
+                line[f"q_ij.{ph+1}"].append(q[ph]) 
+                line[f"q_ji.{ph+1}"].append(q[int(len(q)/2) + ph]) 
 
     def get_lineEAmps(self):
         "Method to extract line emergency amps"

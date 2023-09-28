@@ -14,6 +14,58 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
         super().__init__(redirects, redirects, precompile)
     
+    def create_buses(self):
+
+        # initialize bus container 
+        self.buses = [] 
+
+        # iterate over all bus names
+        for bn in self.dss.Circuit.AllBusNames():
+
+            # set active bus
+            self.dss.Circuit.SetActiveBus(bn)
+
+            # get bus coordinates
+            x = self.dss.Bus.X()
+            y = self.dss.Bus.Y()
+
+            # build dictionary with required data for visualization    
+            bus = {
+                "uid": bn,
+                "x": x,
+                "y": y,
+            }
+
+            # get bus nodes/terminals
+            nodes = self.dss.Bus.Nodes()
+
+            # create voltage magnitude container for each bus-terminal combination
+            for node in nodes:
+                bus[f"vm.{node}"] = []
+
+            # append to container
+            self.buses.append(bus)
+
+    def read_bus_voltages(self):
+
+        for bus in self.buses:
+
+            # set active bus
+            self.dss.Circuit.SetActiveBus(bus["uid"])
+
+            # get current bus voltages
+            voltages = self.dss.Bus.VMagAngle()
+
+            # get voltage magnitudes
+            vm = voltages[0::2] 
+
+            # get bus nodes/terminals
+            terminals = self.dss.Bus.Nodes()
+
+            # create voltage magnitude container for each bus-terminal combination
+            for i, node in enumerate(terminals):
+                bus[f"vm.{node}"].append(vm[i]) 
+
     def write_PMD_bus(self):
 
         # initialize bus structure
