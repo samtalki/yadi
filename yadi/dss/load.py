@@ -21,12 +21,11 @@ class DSS_Load(shunt.DSS_Shunt):
         self.loads = [] 
 
         # set first load as active 
-        self.dss.Loads.First()
+        load_idx, load = 0, self.dss.Loads.First()
 
-        while True:
+        while load:
             # set load as active
             ln = self.dss.Loads.Name()
-
 
             # build dictionary with required data for visualization    
             load = {
@@ -38,22 +37,22 @@ class DSS_Load(shunt.DSS_Shunt):
             # append to container
             self.loads.append(load)
 
-            if not self.dss.Loads.Next() > 0:
-                break
+            load =  self.dss.Loads.Next()
+            load_idx += 1 #increment index
 
     def read_load_power(self):
 
         for load in self.loads:
-
-            # Kw and Kvar of the load
-            p = self.dss.Loads.kW()
-            q = self.dss.Loads.kvar()
 
             # get load uid
             uid = load["uid"]
 
             # set active load
             self.dss.Circuit.SetActiveElement(f"Load.{uid}")
+
+            # Kw and Kvar of the load
+            p = self.dss.Loads.kW()
+            q = self.dss.Loads.kvar()
 
             # get power
             load["p"].append(p)

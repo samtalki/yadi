@@ -25,6 +25,12 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             # set active bus
             self.dss.Circuit.SetActiveBus(bn)
 
+            # number of nodes
+            num_nodes = self.dss.Bus.NumNodes()
+
+            # get xfmr phases
+            num_phases = self.dss.CktElement.NumPhases()
+
             # get bus coordinates
             x = self.dss.Bus.X()
             y = self.dss.Bus.Y()
@@ -34,6 +40,8 @@ class DSS_Bus(load_shape.DSS_LoadShape):
                 "uid": bn,
                 "x": x,
                 "y": y,
+                "nodes": num_nodes,
+                "phases": num_phases, 
             }
 
             # get bus nodes/terminals

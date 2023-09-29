@@ -16,28 +16,27 @@ class DSS_Transformer(line.DSS_Line):
 
     def create_xfmrs(self):
 
-        # initialize xfmr container 
-        self.xfmrs = [] 
-
         # set first xfmr as active 
-        self.dss.Transformers.First()
+        xfmr_idx, xfmr = 0, self.dss.Transformers.First()
 
-        while True:
+        while xfmr:
             # set xfmr as active
             tn = self.dss.Transformers.Name()
 
             # from and to buses
             f_bus, t_bus = self.dss.CktElement.BusNames()
 
+            # get xfmr phases
+            num_phases = self.dss.CktElement.NumPhases()
+
             # build dictionary with required data for visualization    
             xfmr = {
                 "uid": tn,
-                "f_bus": f_bus.split(".")[0],
-                "t_bus": t_bus.split(".")[0],
+                "Transformer": True,
+                "phases": num_phases,
+                "source": f_bus.split(".")[0],
+                "target": t_bus.split(".")[0],
             }
-
-            # get xfmr phases
-            num_phases = self.dss.CktElement.NumPhases()
 
             # create voltage magnitude container for each xfmr-terminal combination
             for ph in range(num_phases):
@@ -47,39 +46,40 @@ class DSS_Transformer(line.DSS_Line):
                 xfmr[f"q_ji.{ph+1}"] = []
 
             # append to container
-            self.xfmrs.append(xfmr)
+            self.branches.append(xfmr)
 
-            # next load
-            if not self.dss.Loads.Next() > 0:
-                break
+            xfmr = self.dss.Transformers.Next() 
+            xfmr_idx += 1 #increment index
 
     def read_xfmr_power(self):
 
-        for xfmr in self.xfmrs:
+        for xfmr in self.branches:
 
-            # get xfmr uid
-            uid = xfmr["uid"]
+            if xfmr["Transformer"]:
 
-            # set active xfmr
-            self.dss.Circuit.SetActiveElement(f"Transformer.{uid}")
+                # get xfmr uid
+                uid = xfmr["uid"]
 
-            # get xfmr active powers
-            if "reg" in uid:
-                p = [i for i in self.dss.cktelement_powers()[0::2] if i != 0]
-                q = [i for i in self.dss.cktelement_powers()[1::2] if i != 0]
-            else:
-                p = self.dss.CktElement.Powers()[0::2]
-                q = self.dss.CktElement.Powers()[1::2]
+                # set active xfmr
+                self.dss.Circuit.SetActiveElement(f"Transformer.{uid}")
 
-            # get xfmr phases
-            num_phases = self.dss.CktElement.NumPhases()
+                # get xfmr active powers
+                if "reg" in uid:
+                    p = [i for i in self.dss.cktelement_powers()[0::2] if i != 0]
+                    q = [i for i in self.dss.cktelement_powers()[1::2] if i != 0]
+                else:
+                    p = self.dss.CktElement.Powers()[0::2]
+                    q = self.dss.CktElement.Powers()[1::2]
 
-            # create voltage magnitude container for each xfmr-terminal combination
-            for ph in range(num_phases):
-                xfmr[f"p_ij.{ph+1}"].append(p[ph]) 
-                xfmr[f"p_ji.{ph+1}"].append(p[int(len(p)/2) + ph]) 
-                xfmr[f"q_ij.{ph+1}"].append(q[ph]) 
-                xfmr[f"q_ji.{ph+1}"].append(q[int(len(q)/2) + ph]) 
+                # get xfmr phases
+                num_phases = self.dss.CktElement.NumPhases()
+
+                # create voltage magnitude container for each xfmr-terminal combination
+                for ph in range(num_phases):
+                    xfmr[f"p_ij.{ph+1}"].append(p[ph]) 
+                    xfmr[f"p_ji.{ph+1}"].append(p[int(len(p)/2) + ph]) 
+                    xfmr[f"q_ij.{ph+1}"].append(q[ph]) 
+                    xfmr[f"q_ji.{ph+1}"].append(q[int(len(q)/2) + ph]) 
 
     def get_trafoEAmps(self):
         "Method to extract transformers emergency amps"
