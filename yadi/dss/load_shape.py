@@ -136,8 +136,8 @@ class DSS_LoadShape(monitor.DSS_Monitor):
             self.__split_loadShapes(self.__extract_loadShapes())
         kwDemand = pd.read_pickle(kwDemand_path)
         kvarDemand = pd.read_pickle(kvarDemand_path)
-        self.simulation_steps = len(kwDemand)
-        self.kwDemand = kwDemand
-        self.kvarDemand = kvarDemand
+        # self.simulation_steps = len(kwDemand)
+        # self.kwDemand = kwDemand
+        # self.kvarDemand = kvarDemand
         return kwDemand, kvarDemand
 
