@@ -35,6 +35,9 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             x = self.dss.Bus.X()
             y = self.dss.Bus.Y()
 
+            # base LN voltage base
+            kv_base = self.dss.Bus.kVBase()
+
             # build dictionary with required data for visualization    
             bus = {
                 "uid": bn,
@@ -42,6 +45,8 @@ class DSS_Bus(load_shape.DSS_LoadShape):
                 "y": y,
                 "nodes": num_nodes,
                 "phases": num_phases, 
+                "kV_base": kv_base,
+                "vm": {},
             }
 
             # get bus nodes/terminals
@@ -49,7 +54,7 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
             # create voltage magnitude container for each bus-terminal combination
             for node in nodes:
-                bus[f"vm.{node}"] = []
+                bus["vm"][f"{node}"] = []
 
             # append to container
             self.buses.append(bus)
@@ -72,7 +77,7 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
             # create voltage magnitude container for each bus-terminal combination
             for i, node in enumerate(terminals):
-                bus[f"vm.{node}"].append(vm[i]) 
+                bus["vm"][f"{node}"].append(vm[i]) 
 
     def write_PMD_bus(self):
 
