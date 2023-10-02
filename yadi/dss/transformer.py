@@ -36,14 +36,18 @@ class DSS_Transformer(line.DSS_Line):
                 "phases": num_phases,
                 "source": f_bus.split(".")[0],
                 "target": t_bus.split(".")[0],
+                "pij": {},
+                "pji": {},
+                "qij": {},
+                "qji": {},
             }
 
             # create voltage magnitude container for each xfmr-terminal combination
             for ph in range(num_phases):
-                xfmr[f"p_ij.{ph+1}"] = []
-                xfmr[f"p_ji.{ph+1}"] = []
-                xfmr[f"q_ij.{ph+1}"] = []
-                xfmr[f"q_ji.{ph+1}"] = []
+                xfmr["pij"][f"{ph+1}"] = []
+                xfmr["pji"][f"{ph+1}"] = []
+                xfmr["qij"][f"{ph+1}"] = []
+                xfmr["qji"][f"{ph+1}"] = []
 
             # append to container
             self.branches.append(xfmr)
@@ -76,10 +80,10 @@ class DSS_Transformer(line.DSS_Line):
 
                 # create voltage magnitude container for each xfmr-terminal combination
                 for ph in range(num_phases):
-                    xfmr[f"p_ij.{ph+1}"].append(p[ph]) 
-                    xfmr[f"p_ji.{ph+1}"].append(p[int(len(p)/2) + ph]) 
-                    xfmr[f"q_ij.{ph+1}"].append(q[ph]) 
-                    xfmr[f"q_ji.{ph+1}"].append(q[int(len(q)/2) + ph]) 
+                    xfmr["pij"][f"{ph+1}"].append(p[ph]) 
+                    xfmr["pji"][f"{ph+1}"].append(p[int(len(p)/2) + ph]) 
+                    xfmr["qij"][f"{ph+1}"].append(q[ph]) 
+                    xfmr["qji"][f"{ph+1}"].append(q[int(len(q)/2) + ph]) 
 
     def get_trafoEAmps(self):
         "Method to extract transformers emergency amps"

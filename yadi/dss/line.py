@@ -10,7 +10,6 @@ class DSS_Line(bus.DSS_Bus):
     def __init__(self, redirects, precompile, verbose=False):
         """"
         Class for handling lines in OpenDSS.
-
         """
 
         super().__init__(redirects, redirects, precompile)
@@ -41,14 +40,18 @@ class DSS_Line(bus.DSS_Bus):
                 "phases": num_phases,
                 "source": f_bus.split(".")[0],
                 "target": t_bus.split(".")[0],
+                "pij": {},
+                "pji": {},
+                "qij": {},
+                "qji": {},
             }
 
             # create voltage magnitude container for each line-terminal combination
             for ph in range(num_phases):
-                line[f"p_ij.{ph+1}"] = []
-                line[f"p_ji.{ph+1}"] = []
-                line[f"q_ij.{ph+1}"] = []
-                line[f"q_ji.{ph+1}"] = []
+                line["pij"][f"{ph+1}"] = []
+                line["pji"][f"{ph+1}"] = []
+                line["qij"][f"{ph+1}"] = []
+                line["qji"][f"{ph+1}"] = []
 
             # append to container
             self.branches.append(line)
@@ -77,10 +80,10 @@ class DSS_Line(bus.DSS_Bus):
 
                 # create voltage magnitude container for each line-terminal combination
                 for ph in range(num_phases):
-                    line[f"p_ij.{ph+1}"].append(p[ph]) 
-                    line[f"p_ji.{ph+1}"].append(p[int(len(p)/2) + ph]) 
-                    line[f"q_ij.{ph+1}"].append(q[ph]) 
-                    line[f"q_ji.{ph+1}"].append(q[int(len(q)/2) + ph]) 
+                    line["pij"][f"{ph+1}"].append(p[ph]) 
+                    line["pji"][f"{ph+1}"].append(p[int(len(p)/2) + ph]) 
+                    line["qij"][f"{ph+1}"].append(q[ph]) 
+                    line["qji"][f"{ph+1}"].append(q[int(len(q)/2) + ph]) 
 
     def get_lineEAmps(self):
         "Method to extract line emergency amps"
