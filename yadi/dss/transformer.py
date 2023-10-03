@@ -24,18 +24,31 @@ class DSS_Transformer(line.DSS_Line):
             tn = self.dss.Transformers.Name()
 
             # from and to buses
-            f_bus, t_bus = self.dss.CktElement.BusNames()
+            f_bus_name, t_bus_name = self.dss.CktElement.BusNames()
 
-            # get xfmr phases
-            num_phases = self.dss.CktElement.NumPhases()
+            # from and to buses
+            f_bus_name = f_bus_name.split(".")[0]
+            t_bus_name = t_bus_name.split(".")[0]
+
+            # read buses data
+            f_bus = self.names_to_buses[f_bus_name]
+            t_bus = self.names_to_buses[t_bus_name]
+
+            # nodes
+            f_bus_nodes = f_bus["nodes"]
+            t_bus_nodes = t_bus["nodes"]
+            nodes = []
+
+            for ni, nj in zip(f_bus_nodes, t_bus_nodes):
+                nodes.append(f"{ni}-{nj}")
 
             # build dictionary with required data for visualization    
             xfmr = {
                 "uid": tn,
                 "Transformer": True,
-                "phases": num_phases,
-                "source": f_bus.split(".")[0],
-                "target": t_bus.split(".")[0],
+                "nodes": nodes,
+                "source": f_bus_name,
+                "target": t_bus_name,
                 "pij": {},
                 "pji": {},
                 "qij": {},
@@ -43,11 +56,11 @@ class DSS_Transformer(line.DSS_Line):
             }
 
             # create voltage magnitude container for each xfmr-terminal combination
-            for ph in range(num_phases):
-                xfmr["pij"][f"{ph+1}"] = []
-                xfmr["pji"][f"{ph+1}"] = []
-                xfmr["qij"][f"{ph+1}"] = []
-                xfmr["qji"][f"{ph+1}"] = []
+            for node in nodes:
+                xfmr["pij"][f"{node}"] = []
+                xfmr["pji"][f"{node}"] = []
+                xfmr["qij"][f"{node}"] = []
+                xfmr["qji"][f"{node}"] = []
 
             # append to container
             self.branches.append(xfmr)
@@ -74,16 +87,16 @@ class DSS_Transformer(line.DSS_Line):
                 else:
                     p = self.dss.CktElement.Powers()[0::2]
                     q = self.dss.CktElement.Powers()[1::2]
-
-                # get xfmr phases
-                num_phases = self.dss.CktElement.NumPhases()
+                
+                # get number of nodes 
+                nodes = xfmr["nodes"] 
 
                 # create voltage magnitude container for each xfmr-terminal combination
-                for ph in range(num_phases):
-                    xfmr["pij"][f"{ph+1}"].append(p[ph]) 
-                    xfmr["pji"][f"{ph+1}"].append(p[int(len(p)/2) + ph]) 
-                    xfmr["qij"][f"{ph+1}"].append(q[ph]) 
-                    xfmr["qji"][f"{ph+1}"].append(q[int(len(q)/2) + ph]) 
+                for n, node in enumerate(nodes):
+                    xfmr["pij"][f"{node}"].append(p[n]) 
+                    xfmr["pji"][f"{node}"].append(p[int(len(p)/2) + n]) 
+                    xfmr["qij"][f"{node}"].append(q[n]) 
+                    xfmr["qji"][f"{node}"].append(q[int(len(q)/2) + n]) 
 
     def get_trafoEAmps(self):
         "Method to extract transformers emergency amps"

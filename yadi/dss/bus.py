@@ -18,15 +18,13 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
         # initialize bus container 
         self.buses = [] 
+        self.names_to_buses = {}
 
         # iterate over all bus names
         for bn in self.dss.Circuit.AllBusNames():
 
             # set active bus
             self.dss.Circuit.SetActiveBus(bn)
-
-            # number of nodes
-            num_nodes = self.dss.Bus.NumNodes()
 
             # get xfmr phases
             num_phases = self.dss.CktElement.NumPhases()
@@ -38,19 +36,18 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             # base LN voltage base
             kv_base = self.dss.Bus.kVBase()
 
+            # get bus nodes/terminals
+            nodes = self.dss.Bus.Nodes()
+
             # build dictionary with required data for visualization    
             bus = {
                 "uid": bn,
                 "x": x,
                 "y": y,
-                "nodes": num_nodes,
-                "phases": num_phases, 
+                "nodes": nodes,
                 "kV_base": kv_base,
                 "vm": {},
             }
-
-            # get bus nodes/terminals
-            nodes = self.dss.Bus.Nodes()
 
             # create voltage magnitude container for each bus-terminal combination
             for node in nodes:
@@ -58,6 +55,7 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
             # append to container
             self.buses.append(bus)
+            self.names_to_buses[bn] = bus
 
     def read_bus_voltages(self):
 

@@ -27,19 +27,27 @@ class DSS_Line(bus.DSS_Bus):
             ln = self.dss.Lines.Name()
 
             # from and to buses
-            f_bus = self.dss.Lines.Bus1()
-            t_bus = self.dss.Lines.Bus2()
+            f_bus_name = self.dss.Lines.Bus1().split(".")[0]
+            t_bus_name = self.dss.Lines.Bus2().split(".")[0]
 
-            # get line phases
-            num_phases = self.dss.Lines.Phases()
+            # read buses data
+            f_bus = self.names_to_buses[f_bus_name]
+            t_bus = self.names_to_buses[t_bus_name]
+
+            # nodes (active nodes from each bus in OpenDss)
+            f_bus_nodes = f_bus["nodes"]
+            t_bus_nodes = t_bus["nodes"]
+            nodes = []
+            for ni, nj in zip(f_bus_nodes, t_bus_nodes):
+                nodes.append(f"{ni}-{nj}")
 
             # build dictionary with required data for visualization    
             line = {
                 "uid": ln,
                 "Transformer": False,
-                "phases": num_phases,
-                "source": f_bus.split(".")[0],
-                "target": t_bus.split(".")[0],
+                "nodes": nodes,
+                "source": f_bus_name,
+                "target": t_bus_name,
                 "pij": {},
                 "pji": {},
                 "qij": {},
@@ -47,11 +55,11 @@ class DSS_Line(bus.DSS_Bus):
             }
 
             # create voltage magnitude container for each line-terminal combination
-            for ph in range(num_phases):
-                line["pij"][f"{ph+1}"] = []
-                line["pji"][f"{ph+1}"] = []
-                line["qij"][f"{ph+1}"] = []
-                line["qji"][f"{ph+1}"] = []
+            for node in nodes:
+                line["pij"][f"{node}"] = []
+                line["pji"][f"{node}"] = []
+                line["qij"][f"{node}"] = []
+                line["qji"][f"{node}"] = []
 
             # append to container
             self.branches.append(line)
@@ -76,14 +84,14 @@ class DSS_Line(bus.DSS_Bus):
                 q = self.dss.CktElement.Powers()[1::2]
 
                 # get line phases
-                num_phases = self.dss.Lines.Phases()
+                nodes = line["nodes"]
 
                 # create voltage magnitude container for each line-terminal combination
-                for ph in range(num_phases):
-                    line["pij"][f"{ph+1}"].append(p[ph]) 
-                    line["pji"][f"{ph+1}"].append(p[int(len(p)/2) + ph]) 
-                    line["qij"][f"{ph+1}"].append(q[ph]) 
-                    line["qji"][f"{ph+1}"].append(q[int(len(q)/2) + ph]) 
+                for n, node in enumerate(nodes):
+                    line["pij"][f"{node}"].append(p[n]) 
+                    line["pji"][f"{node}"].append(p[int(len(p)/2) + n]) 
+                    line["qij"][f"{node}"].append(q[n]) 
+                    line["qji"][f"{node}"].append(q[int(len(q)/2) + n]) 
 
     def get_lineEAmps(self):
         "Method to extract line emergency amps"
