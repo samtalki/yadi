@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import yadi.yadi.dss.line as line 
+import math
 import os
 
 
@@ -14,7 +15,30 @@ class DSS_Transformer(line.DSS_Line):
         """
         super().__init__(redirects, redirects, precompile)
 
+    def get_regulators(self):
+
+        # initialize line container 
+        self.controlled_xfmrs = [] 
+
+        # set first xfmr as active 
+        reg_idx, reg = 0, self.dss.RegControls.First()
+
+        while reg:
+
+            # get name of controlled xfmr 
+            tn = self.dss.RegControls.Transformer()
+
+            # push name to list 
+            self.controlled_xfmrs.append(tn)
+            
+            # move to next regulator
+            reg = self.dss.RegControls.Next() 
+            reg_idx += 1 #increment index
+
     def create_xfmrs(self):
+
+        # define regulator structure
+        self.get_regulators()
 
         # set first xfmr as active 
         xfmr_idx, xfmr = 0, self.dss.Transformers.First()
@@ -81,12 +105,8 @@ class DSS_Transformer(line.DSS_Line):
                 self.dss.Circuit.SetActiveElement(f"Transformer.{uid}")
 
                 # get xfmr active powers
-                if "reg" in uid:
-                    p = [i for i in self.dss.CktElement.Powers()[0::2] if i != 0]
-                    q = [i for i in self.dss.CktElement.Powers()[1::2] if i != 0]
-                else:
-                    p = self.dss.CktElement.Powers()[0::2]
-                    q = self.dss.CktElement.Powers()[1::2]
+                p = [i for i in self.dss.CktElement.Powers()[0::2] if not math.isclose(i, 0.0, rel_tol=1e-20)]
+                q = [i for i in self.dss.CktElement.Powers()[1::2] if not math.isclose(i, 0.0, rel_tol=1e-20)]
                 
                 # get number of nodes 
                 nodes = xfmr["nodes"] 
