@@ -82,8 +82,8 @@ class DSS_Transformer(line.DSS_Line):
 
                 # get xfmr active powers
                 if "reg" in uid:
-                    p = [i for i in self.dss.cktelement_powers()[0::2] if i != 0]
-                    q = [i for i in self.dss.cktelement_powers()[1::2] if i != 0]
+                    p = [i for i in self.dss.CktElement.Powers()[0::2] if i != 0]
+                    q = [i for i in self.dss.CktElement.Powers()[1::2] if i != 0]
                 else:
                     p = self.dss.CktElement.Powers()[0::2]
                     q = self.dss.CktElement.Powers()[1::2]

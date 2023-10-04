@@ -26,9 +26,6 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             # set active bus
             self.dss.Circuit.SetActiveBus(bn)
 
-            # get xfmr phases
-            num_phases = self.dss.CktElement.NumPhases()
-
             # get bus coordinates
             x = self.dss.Bus.X()
             y = self.dss.Bus.Y()
