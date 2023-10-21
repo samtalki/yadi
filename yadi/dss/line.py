@@ -44,7 +44,7 @@ class DSS_Line(bus.DSS_Bus):
             # build dictionary with required data for visualization    
             line = {
                 "uid": ln,
-                "Transformer": False,
+                "transformer": False,
                 "nodes": nodes,
                 "source": f_bus_name,
                 "target": t_bus_name,
@@ -71,7 +71,7 @@ class DSS_Line(bus.DSS_Bus):
 
         for line in self.branches:
 
-            if not line["Transformer"]:
+            if not line["transformer"]:
 
                 # get line uid
                 uid = line["uid"]

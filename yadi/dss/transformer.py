@@ -63,16 +63,28 @@ class DSS_Transformer(line.DSS_Line):
             t_bus_nodes = t_bus["nodes"]
             nodes = []
 
+            # winding resistance (in percentage)
+            R = self.dss.Transformers.R()
+
+            # winding reactance (in percentage)
+            xhl = self.dss.Transformers.Xhl()
+
+            # winding KVA rating
+            s_base = self.dss.Transformers.kVA()
+
             for ni, nj in zip(f_bus_nodes, t_bus_nodes):
                 nodes.append(f"{ni}-{nj}")
 
             # build dictionary with required data for visualization    
             xfmr = {
                 "uid": tn,
-                "Transformer": True,
+                "transformer": True,
                 "nodes": nodes,
                 "source": f_bus_name,
                 "target": t_bus_name,
+                "R": R,
+                "xhl": xhl,
+                "s_base": s_base,
                 "pij": {},
                 "pji": {},
                 "qij": {},
@@ -96,7 +108,7 @@ class DSS_Transformer(line.DSS_Line):
 
         for xfmr in self.branches:
 
-            if xfmr["Transformer"]:
+            if xfmr["transformer"]:
 
                 # get xfmr uid
                 uid = xfmr["uid"]

@@ -429,4 +429,5 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
             self.read_xfmr_power()
             self.read_load_power()
 
+
         self.__qsts_complete=True

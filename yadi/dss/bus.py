@@ -44,11 +44,13 @@ class DSS_Bus(load_shape.DSS_LoadShape):
                 "nodes": nodes,
                 "kV_base": kv_base,
                 "vm": {},
+                "va": {},
             }
 
             # create voltage magnitude container for each bus-terminal combination
             for node in nodes:
                 bus["vm"][f"{node}"] = []
+                bus["va"][f"{node}"] = []
 
             # append to container
             self.buses.append(bus)
@@ -58,14 +60,18 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
         for bus in self.buses:
 
+            # get name
+            uid = bus["uid"]
+
             # set active bus
-            self.dss.Circuit.SetActiveBus(bus["uid"])
+            self.dss.Circuit.SetActiveBus(uid)
 
             # get current bus voltages
             voltages = self.dss.Bus.VMagAngle()
 
             # get voltage magnitudes
             vm = voltages[0::2] 
+            va = voltages[1::2] 
 
             # get bus nodes/terminals
             terminals = self.dss.Bus.Nodes()
@@ -73,6 +79,7 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             # create voltage magnitude container for each bus-terminal combination
             for i, node in enumerate(terminals):
                 bus["vm"][f"{node}"].append(vm[i]) 
+                bus["va"][f"{node}"].append(va[i]) 
 
     def write_PMD_bus(self):
 

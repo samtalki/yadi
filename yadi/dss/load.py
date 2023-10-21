@@ -48,8 +48,8 @@ class DSS_Load(shunt.DSS_Shunt):
             uid = load["uid"]
 
             # set active load
-            self.dss.Circuit.SetActiveElement(f"Load.{uid}")
-
+            self.dss.Loads.Name(uid)
+            
             # Kw and Kvar of the load
             p = self.dss.Loads.kW()
             q = self.dss.Loads.kvar()
