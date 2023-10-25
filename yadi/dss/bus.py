@@ -67,7 +67,8 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             self.dss.Circuit.SetActiveBus(uid)
 
             # get current bus voltages
-            voltages = self.dss.Bus.VMagAngle()
+            # voltages = self.dss.Bus.VMagAngle()
+            voltages = self.dss.Bus.Voltages()
 
             # get voltage magnitudes
             vm = voltages[0::2] 

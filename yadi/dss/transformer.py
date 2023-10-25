@@ -63,14 +63,32 @@ class DSS_Transformer(line.DSS_Line):
             t_bus_nodes = t_bus["nodes"]
             nodes = []
 
-            # winding resistance (in percentage)
-            R = self.dss.Transformers.R()
 
             # winding reactance (in percentage)
             xhl = self.dss.Transformers.Xhl()
 
             # winding KVA rating
             s_base = self.dss.Transformers.kVA()
+
+            # winding voltage bases
+            num_windings = self.dss.Transformers.NumWindings()
+
+            # wye primitive
+            y_prim = self.dss.CktElement.YPrim()
+
+            # per winding quantities
+            kV = []
+            R = 0
+            for i in range(num_windings):
+
+                # activate winding 
+                self.dss.Transformers.Wdg(i+1)
+
+                # winding voltage base
+                kV.append(self.dss.Transformers.kV())
+
+                # winding resistance (in percentage)
+                R += self.dss.Transformers.R()
 
             for ni, nj in zip(f_bus_nodes, t_bus_nodes):
                 nodes.append(f"{ni}-{nj}")
@@ -85,6 +103,12 @@ class DSS_Transformer(line.DSS_Line):
                 "R": R,
                 "xhl": xhl,
                 "s_base": s_base,
+                "v_base": kV,
+                "y_prim": y_prim,
+                "ir_ij": {},
+                "ii_ij": {},
+                "ir_ji": {},
+                "ii_ji": {},
                 "pij": {},
                 "pji": {},
                 "qij": {},
@@ -93,6 +117,10 @@ class DSS_Transformer(line.DSS_Line):
 
             # create voltage magnitude container for each xfmr-terminal combination
             for node in nodes:
+                xfmr["ir_ij"][f"{node}"] = []
+                xfmr["ii_ij"][f"{node}"] = []
+                xfmr["ir_ji"][f"{node}"] = []
+                xfmr["ii_ji"][f"{node}"] = []
                 xfmr["pij"][f"{node}"] = []
                 xfmr["pji"][f"{node}"] = []
                 xfmr["qij"][f"{node}"] = []
@@ -115,6 +143,8 @@ class DSS_Transformer(line.DSS_Line):
 
                 # set active xfmr
                 self.dss.Circuit.SetActiveElement(f"Transformer.{uid}")
+                ir = [i for i in self.dss.CktElement.Currents()[0::2] if not math.isclose(i, 0.0, rel_tol=1e-20)]
+                ii = [i for i in self.dss.CktElement.Currents()[1::2] if not math.isclose(i, 0.0, rel_tol=1e-20)]
 
                 # get xfmr active powers
                 p = [i for i in self.dss.CktElement.Powers()[0::2] if not math.isclose(i, 0.0, rel_tol=1e-20)]
@@ -125,9 +155,13 @@ class DSS_Transformer(line.DSS_Line):
 
                 # create voltage magnitude container for each xfmr-terminal combination
                 for n, node in enumerate(nodes):
+                    xfmr["ir_ij"][f"{node}"].append(ir[n]) 
+                    xfmr["ii_ij"][f"{node}"].append(ii[n]) 
+                    xfmr["ir_ji"][f"{node}"].append(ir[int(len(p)/2) + n]) 
+                    xfmr["ii_ji"][f"{node}"].append(ii[int(len(p)/2) + n]) 
                     xfmr["pij"][f"{node}"].append(p[n]) 
-                    xfmr["pji"][f"{node}"].append(p[int(len(p)/2) + n]) 
                     xfmr["qij"][f"{node}"].append(q[n]) 
+                    xfmr["pji"][f"{node}"].append(p[int(len(p)/2) + n]) 
                     xfmr["qji"][f"{node}"].append(q[int(len(q)/2) + n]) 
 
     def get_trafoEAmps(self):
