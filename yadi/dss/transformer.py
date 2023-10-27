@@ -70,7 +70,10 @@ class DSS_Transformer(line.DSS_Line):
             s_base = self.dss.Transformers.kVA()
 
             # wye primitive
-            Gprim, Bprim = self.get_Yprimitive()
+            yprim = self.dss.CktElement.YPrim()
+
+            # get number of nodes including reference
+            n = len(self.dss.CktElement.NodeOrder())
 
             # per winding quantities
             kV, R = self.get_perWindingQuantities()
@@ -89,8 +92,8 @@ class DSS_Transformer(line.DSS_Line):
                 "xhl": xhl,
                 "s_base": s_base,
                 "v_base": kV,
-                "Gprim": Gprim,
-                "Bprim": Bprim,
+                "yprim": yprim,
+                "n": n,
                 "ir_ij": {},
                 "ii_ij": {},
                 "ir_ji": {},

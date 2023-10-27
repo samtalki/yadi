@@ -36,7 +36,16 @@ class DSS_Line(bus.DSS_Bus):
             t_bus = self.names_to_buses[t_bus_name]
 
             # wye primitive
-            Gprim, Bprim = self.get_Yprimitive()
+            yprim = self.dss.CktElement.YPrim()
+
+            # get number of nodes including reference
+            n = len(self.dss.CktElement.NodeOrder())
+
+            # Resistance Matrix [ohm/unit length]
+            Rm = self.dss.Lines.RMatrix()
+
+            # Reactance Matrix [ohm/unit length]
+            Xm = self.dss.Lines.XMatrix()
 
             # nodes (active nodes from each bus in OpenDss)
             f_bus_nodes = f_bus["nodes"]
@@ -49,11 +58,14 @@ class DSS_Line(bus.DSS_Bus):
             line = {
                 "uid": ln,
                 "transformer": False,
+                "length": self.dss.Lines.Length(),
                 "nodes": nodes,
                 "source": f_bus_name,
                 "target": t_bus_name,
-                "Gprim": Gprim,
-                "Bprim": Bprim,
+                "yprim": yprim,
+                "Rm": Rm,
+                "Xm": Xm,
+                "n": n,
                 "pij": {},
                 "pji": {},
                 "qij": {},
@@ -81,19 +93,6 @@ class DSS_Line(bus.DSS_Bus):
             line = self.dss.Lines.Next()
             line_idx += 1 #increment index
 
-    def get_Yprimitive(self):
-
-        # get number of nodes including reference
-        n = len(self.dss.CktElement.NodeOrder())
-        
-        # extract and organize yprim
-        yprim = self.dss.CktElement.YPrim()
-        Yprim_tmp = np.asarray(yprim).reshape((2*n, n), order="F")
-        Yprim = Yprim_tmp.T
-        Gprim = Yprim[:, 0::2]
-        Bprim = Yprim[:, 1::2]
-        
-        return Gprim, Bprim
 
     def read_line_power(self):
 
