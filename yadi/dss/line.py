@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import yadi.yadi.dss.bus as bus 
+import math
 import os
 
 
@@ -34,6 +35,9 @@ class DSS_Line(bus.DSS_Bus):
             f_bus = self.names_to_buses[f_bus_name]
             t_bus = self.names_to_buses[t_bus_name]
 
+            # wye primitive
+            Gprim, Bprim = self.get_Yprimitive()
+
             # nodes (active nodes from each bus in OpenDss)
             f_bus_nodes = f_bus["nodes"]
             t_bus_nodes = t_bus["nodes"]
@@ -48,10 +52,16 @@ class DSS_Line(bus.DSS_Bus):
                 "nodes": nodes,
                 "source": f_bus_name,
                 "target": t_bus_name,
+                "Gprim": Gprim,
+                "Bprim": Bprim,
                 "pij": {},
                 "pji": {},
                 "qij": {},
                 "qji": {},
+                "ir_ij": {},
+                "ii_ij": {},
+                "ir_ji": {},
+                "ii_ji": {},
             }
 
             # create voltage magnitude container for each line-terminal combination
@@ -60,12 +70,30 @@ class DSS_Line(bus.DSS_Bus):
                 line["pji"][f"{node}"] = []
                 line["qij"][f"{node}"] = []
                 line["qji"][f"{node}"] = []
+                line["ir_ij"][f"{node}"] = []
+                line["ii_ij"][f"{node}"] = []
+                line["ir_ji"][f"{node}"] = []
+                line["ii_ji"][f"{node}"] = []
 
             # append to container
             self.branches.append(line)
 
             line = self.dss.Lines.Next()
             line_idx += 1 #increment index
+
+    def get_Yprimitive(self):
+
+        # get number of nodes including reference
+        n = len(self.dss.CktElement.NodeOrder())
+        
+        # extract and organize yprim
+        yprim = self.dss.CktElement.YPrim()
+        Yprim_tmp = np.asarray(yprim).reshape((2*n, n), order="F")
+        Yprim = Yprim_tmp.T
+        Gprim = Yprim[:, 0::2]
+        Bprim = Yprim[:, 1::2]
+        
+        return Gprim, Bprim
 
     def read_line_power(self):
 
@@ -78,6 +106,10 @@ class DSS_Line(bus.DSS_Bus):
 
                 # set active line
                 self.dss.Circuit.SetActiveElement(f"Line.{uid}")
+
+                # openDSS currents
+                ir = self.dss.CktElement.Currents()[0::2]
+                ii = self.dss.CktElement.Currents()[1::2]
 
                 # get line active powers
                 p = self.dss.CktElement.Powers()[0::2]
@@ -92,6 +124,10 @@ class DSS_Line(bus.DSS_Bus):
                     line["pji"][f"{node}"].append(p[int(len(p)/2) + n]) 
                     line["qij"][f"{node}"].append(q[n]) 
                     line["qji"][f"{node}"].append(q[int(len(q)/2) + n]) 
+                    line["ir_ij"][f"{node}"].append(ir[n]) 
+                    line["ii_ij"][f"{node}"].append(ii[n]) 
+                    line["ir_ji"][f"{node}"].append(ir[int(len(p)/2) + n]) 
+                    line["ii_ji"][f"{node}"].append(ii[int(len(p)/2) + n]) 
 
     def get_lineEAmps(self):
         "Method to extract line emergency amps"

@@ -63,32 +63,17 @@ class DSS_Transformer(line.DSS_Line):
             t_bus_nodes = t_bus["nodes"]
             nodes = []
 
-
             # winding reactance (in percentage)
             xhl = self.dss.Transformers.Xhl()
 
             # winding KVA rating
             s_base = self.dss.Transformers.kVA()
 
-            # winding voltage bases
-            num_windings = self.dss.Transformers.NumWindings()
-
             # wye primitive
-            y_prim = self.dss.CktElement.YPrim()
+            Gprim, Bprim = self.get_Yprimitive()
 
             # per winding quantities
-            kV = []
-            R = 0
-            for i in range(num_windings):
-
-                # activate winding 
-                self.dss.Transformers.Wdg(i+1)
-
-                # winding voltage base
-                kV.append(self.dss.Transformers.kV())
-
-                # winding resistance (in percentage)
-                R += self.dss.Transformers.R()
+            kV, R = self.get_perWindingQuantities()
 
             for ni, nj in zip(f_bus_nodes, t_bus_nodes):
                 nodes.append(f"{ni}-{nj}")
@@ -104,7 +89,8 @@ class DSS_Transformer(line.DSS_Line):
                 "xhl": xhl,
                 "s_base": s_base,
                 "v_base": kV,
-                "y_prim": y_prim,
+                "Gprim": Gprim,
+                "Bprim": Bprim,
                 "ir_ij": {},
                 "ii_ij": {},
                 "ir_ji": {},
@@ -131,6 +117,26 @@ class DSS_Transformer(line.DSS_Line):
 
             xfmr = self.dss.Transformers.Next() 
             xfmr_idx += 1 #increment index
+
+    def get_perWindingQuantities(self):
+
+        # winding voltage bases
+        num_windings = self.dss.Transformers.NumWindings()
+
+        kV = []
+        R = 0
+        for i in range(num_windings):
+
+            # activate winding 
+            self.dss.Transformers.Wdg(i+1)
+
+            # winding voltage base
+            kV.append(self.dss.Transformers.kV())
+
+            # winding resistance (in percentage)
+            R += self.dss.Transformers.R()
+
+        return kV, R
 
     def read_xfmr_power(self):
 
