@@ -1,24 +1,24 @@
 """
-OpenDSS Quasi-Static Time Series Simulation Data Structure
+OpenDSS Quasi-Static Time Series Simulation Time Series Structure
 @author: Samuel Talkington
 MIT License
 October 6th, 2021
 
 """
 
+from tkinter import W
 import numpy as np
 import pandas as pd
-import yadi.dss.model as model 
+import yadi.yadi.dss.voltage_source as voltage_source 
 import warnings
 from tqdm import tqdm
 import pathlib
 import os
-from calendar import monthrange
 
 #Optional: Turn off complex value warnings
 #warnings.simplefilter("ignore", np.ComplexWarning)
 
-class DSS_Timeseries(model.DSS_Data):
+class DSS_Timeseries(voltage_source.DSS_VoltageSource):
 
     def __init__(
             self,
@@ -49,7 +49,7 @@ class DSS_Timeseries(model.DSS_Data):
             - verbose (boolean): whether or not to print verbose logs
             - per_unit (boolean): whether or not to return per unit values at all times (default is False) #TODO
         """
-        super().__init__(redirects,precompile=precompile)
+        super().__init__(redirects, precompile=precompile)
 
         #--- Simulation parameters ---#
         self.time_step = time_step
@@ -86,17 +86,59 @@ class DSS_Timeseries(model.DSS_Data):
         self.__qsts_initialized = False
         self.__qsts_complete = False
     
-    def get_node_qsts_df(self,node):
-        """
-        Gets the MVTS DF at a specific node
-        """
-        if(self.nodal_mvts_dfs is None):
-            warnings.warn("QSTS has not been run yet, running...")
-            self.run()
-            return self.nodal_mvts_dfs[node]
-        else:
-            return self.nodal_mvts_dfs[node]
+    def __check_qsts_initialization(self, native=False):
+        """Check if QSTS has been properly initialized"""
+         #Check to see if QSTS is initialized
+        if(not self.__qsts_initialized):
+            warnings.warn("QSTS has not been initialized. Initiailizing before run.")
+            self.compile_dss()
+            self.initialize_qsts(native)
 
+        elif(self.__qsts_complete):
+            # warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
+            self.compile_dss()
+            self.initialize_qsts(native)
+
+    def initialize_qsts(self, native, verbose=False):
+        """
+        Initialize a chosen-mode Quasi-Static Time Series simulation.
+
+        Params:
+            monitor_loads (boolean): Whether or not to set monitors on all loads.
+
+        """
+        errs = []
+
+        if(native):
+            number = self.simulation_steps
+
+            self.set_monitor_all_loads(verbose=verbose)
+
+            self.set_monitor_all_lines(verbose=verbose)
+
+            self.set_monitor_all_trafos(verbose=verbose)
+        else:
+            number = self.solution_number
+
+        errs.append(
+            self.dss.run_command(f'Set controlmode={self.simulation_controlmode}')
+        )
+        errs.append(
+            self.dss.run_command(f"Set mode={self.simulation_mode} "
+                                 f"number={number} "
+                                 f"stepsize={self.time_step} "
+                                 f"maxcontroliter={self.maxcontroliter} "
+                                 f"maxiterations={self.maxiterations} "
+                                 f"miniterations={self.miniterations} "
+                                 )
+        )
+
+        # print('QSTS Initialized, Returned: ', [err for err in errs])
+        self.__qsts_initialized = True
+
+    #  #################################################
+    #  ######### run net node injection QSTS #########
+    #  #################################################
 
     def run(self):
         """
@@ -126,7 +168,7 @@ class DSS_Timeseries(model.DSS_Data):
             self.__run_qsts_duty(nodes,n_nodes)
         
         nodal_mvts_dfs = dict()
-        dt_index = pd.date_range(start='1/1/2020',periods=self.simulation_steps,freq='1H')
+        dt_index = pd.date_range(start='1/1/2019', periods=self.simulation_steps, freq='1H')
         
         for i,node in enumerate(nodes):
             D_i = pd.DataFrame(index = dt_index,columns=['netloadV','netloadP','netloadQ'])
@@ -141,7 +183,8 @@ class DSS_Timeseries(model.DSS_Data):
     #TODO: Enable no-neutral xfmr currents
     def __run_qsts_duty(self,nodes,n_nodes):
         """
-        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage phasors, complex powers, and currents, for each node
+        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataset of 
+        voltage phasors, complex powers, and currents, for each node
         """
         # Get the names of all lines and transformers, 
         names_lines = self.dss.Lines.AllNames()
@@ -169,7 +212,7 @@ class DSS_Timeseries(model.DSS_Data):
         tot_cond_lines = np.sum(n_cond_lines)
         tot_cond_xfmrs = np.sum(n_cond_xfmrs)
 
-        #Set internal fields for the data structure
+        # Set internal fields for the data structure
         self.voltages_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
         self.vmags_pu_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.double) #voltage magnitude multivariate timeseries array MxN
         self.complex_powers_mvts = np.empty((self.simulation_steps,n_nodes),dtype=np.cdouble) #voltage multivariate timeseries array MxN
@@ -239,6 +282,17 @@ class DSS_Timeseries(model.DSS_Data):
             
         self.__qsts_complete=True
 
+    def get_node_qsts_df(self,node):
+        """
+        Gets the MVTS DF at a specific node
+        """
+        if(self.nodal_mvts_dfs is None):
+            warnings.warn("QSTS has not been run yet, running...")
+            self.run()
+            return self.nodal_mvts_dfs[node]
+        else:
+            return self.nodal_mvts_dfs[node]
+
     def get_system_deviations(self,granularity=900):
         """
         Construct multivariate timeseries datasets of finite differences of:
@@ -279,310 +333,101 @@ class DSS_Timeseries(model.DSS_Data):
         }
         return D_diff_N
 
-    def get_monitor_timeseries(self,element_name,element_type="Load"):
+
+    #  #################################################
+    #  ######### run native OpenDSS QSTS #########
+    #  #################################################
+
+    def run_native_qsts(self, userDemand=None):
         """
-        Gets the voltage, active, and reactive power timeseries dictionary for a single elemented in the system: 
-        D_i = {(V_i,t,P_i,t,Q_i,t)}_{t=1,..,M}
+        runs a native QSTS simulation from OpenDSS.
 
         Parameters:
         ---
-            dss: the dss object
-            element: name of the lement
+            userDemand: 
         """
-        #simulation_steps = int(60*60*24 / time_step) #Number of simulation steps in seconds
-        #set_monitor(inj_node) #Setup the real and reactive power node monitor
-        #initialize_qsts(dss,time_step,simulation_steps) #QSTS actions..
-        #run_qsts_year(dss)
-        
-        voltage_ts = self.__export_monitor_voltage(element_name)
-        power_ts = self.__export_monitor_power(element_name)    
+        if userDemand is not None:
+            self.setAllLoadShapes(userDemand[0], userDemand[1])
 
-        D = {
-            'voltage_ts':voltage_ts,
-            'power_ts':power_ts
-        }
-        return D
-
-
-    def __export_monitor(self,monitor_name,verbose=False):
-        """Exports a single monitor to a dataframe"""
-        err = self.dss.run_command("export monitors {monitor_name}".format(
-                monitor_name=monitor_name
-            )
-        )
-        print('Monitor {monitor_name} Export Returned {err}'.format(
-            monitor_name=monitor_name,
-            err=err
-        ))
-        monitor_info = self.dss.utils.monitors_to_dataframe() #Get the monitor info df
-        #Get the monitor info df index for monitor_name
-        monitor_index = monitor_info.index.get_loc(monitor_info.index[monitor_info.index == monitor_name][0])
-        
-        #Make timeseries_df from exported csv
-        timeseries_df = pd.read_csv(monitor_info['FileName'][monitor_index],sep=r'\s*,\s*',
-                        header=0, encoding='ascii', engine='python')
-        if(verbose):
-            print('monitor_name is: ',monitor_name)
-            print('monitor_idex is: ',monitor_index)
-        return timeseries_df
-
-
-
-    def set_loadshape(self,loadshape_path,loadshape_name='loadshape1'):
-        """
-        Sets a loadshape for all loads
-        """
-        self.dss.run_command(
-            "Redirect {loadshape_path}".format(
-                loadshape_path = loadshape_path
-            )
-        )
-        self.dss.run_command(
-            "batchedit load..*  yearly={loadshape_name} ".format(
-                loadshape_name=loadshape_name
-            )
-            
-        ) #change all loads            
-    
-
-    def __check_qsts_initialization(self):
-        """Check if QSTS has been properly initialized"""
-         #Check to see if QSTS is initialized
-        if(not self.__qsts_initialized):
-            warnings.warn("QSTS has not been initialized. Initiailizing before run.")
-            self.compile_dss(self.redirects)
-            self.initialize_qsts()
-        elif(self.__qsts_complete):
-            warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
-            self.compile_dss(self.redirects)
-            self.initialize_qsts()
-
-    #  #################################################
-    #  ######### native Opendss - monthly QSTS #########
-    #  #################################################
-
-    def initialize_qsts(self, monitor_loads=False, verbose=False):
-        """
-        Initialize a chosen-mode Quasi-Static Time Series simulation.
-
-        Params:
-            monitor_loads (boolean): Whether or not to set monitors on all loads.
-
-        """
-        errs = []
-
-        if(monitor_loads):
-            self.__set_monitor_all_loads(verbose=verbose)
-        errs.append(
-            self.dss.run_command(f'Set controlmode={self.simulation_controlmode}')
-        )
-        errs.append(
-            self.dss.run_command(f"Set mode={self.simulation_mode} "
-                                 f"number={self.solution_number} "
-                                 f"stepsize={self.time_step} "
-                                 f"maxcontroliter={self.maxcontroliter} "
-                                 f"maxiterations={self.maxiterations} "
-                                 f"miniterations={self.miniterations} "
-                                 )
-        )
-        errs.append(
-            self.dss.run_command('Set maxcontroliter=600')
-        )
-        print('QSTS Initialized, Returned: ', [err for err in errs])
-        self.__qsts_initialized = True
-
-    def run_monthly(self, scriptPath, month):
-        """
-        Compute monthly voltage, active, and reactive power timeseries dictionary for a single node i in the system:
-        D_i = {(V_i,t,P_i,t,Q_i,t)}_{t=1,..,M} for all i
-
-        Parameters:
-        ---
-            month: {01-jan, 02-feb, ....}
-        """
-        self.scriptPath = scriptPath
-        self.monthlyDemand_dir = pathlib.Path(self.scriptPath).joinpath("test_cases", "secondary_test_network", "Profiles", "MonthlyDemand")
-        if not os.path.isdir(self.monthlyDemand_dir):
-            os.mkdir(self.monthlyDemand_dir)
-        # load residential demand
-        loadShapes = self.__load_LoadShapePerMonth(month)
-        # set monthly loadShapes
-        self.__setAllLoadShapes(loadShapes)
         # run routine with modified loadShapes
-        self.__run_qsts_OpenDSS_duty()
+        self.__run_native_qsts_duty()
 
-    def __setAllLoadShapes(self, loadShapes):
-        "Method to modify loadShapes from a DSS file"
-        loadShapeNames = self.dss.LoadShape.AllNames()
-        for n, loadShapeName in enumerate(loadShapeNames):
-            if loadShapeName == 'default':
-                continue
-            # extract profiles
-            Pmult = list(loadShapes.loc[:, loadShapeName + "_Pmult"].values)
-            if loadShapeName + "_Qmult" in loadShapes.columns:
-                Qmult = list(loadShapes.loc[:, loadShapeName + "_Qmult"].values)
-            else:
-                Qmult = None
-
-            if Qmult is not None:
-                self.__modifyLoadShapePQ(Pmult, Qmult, loadShapeName)
-            else:
-                self.__modifyLoadShapeP(Pmult, loadShapeName)
-
-    def __modifyLoadShapeP(self, Pmult, name):
-        self.dss.run_command(f"edit loadshape.{name} "
-                             f"Npts={len(Pmult)} "
-                             f"mult={Pmult} ")
-
-    def __modifyLoadShapePQ(self, Pmult, Qmult, name):
-        self.dss.run_command(f"edit loadshape.{name} "
-                             f"Npts={len(Pmult)} "
-                             f"mult={Pmult} "
-                             f"Qmult={Qmult}")
-
-    def __extract_loadShapes(self):
-        """extract loadshapes from dss file"""
-        loadShapeNames = self.dss.LoadShape.AllNames()
-        loadShape_dict = dict()
-        for n, loadShapeName in enumerate(loadShapeNames):
-            if loadShapeName == 'default':
-                continue
-            # set active loadshape using its name
-            self.dss.LoadShape.Name(loadShapeName)
-            # checkName = self.dss.LoadShape.Name()
-            # get Pmult and Qmult
-            Pmult = self.dss.LoadShape.PMult()
-            Qmult = self.dss.LoadShape.QMult()
-            # Pmult_len = len(Pmult)
-            if len(Pmult) != 1:
-                loadShape_dict[loadShapeName + "_Pmult"] = np.asarray(Pmult)
-            if len(Qmult) != 1:
-                loadShape_dict[loadShapeName + "_Qmult"] = np.asarray(Qmult)
-        loadShapes = pd.DataFrame().from_dict(loadShape_dict)
-        return loadShapes
-
-    def __split_loadShapes(self, loadShapes):
-        """split loadshapes by months"""
-        skipRows = 0
-        monthsForIter = ["01", "02", "03", "04", "05", "06",
-                         "07", "08", "09", "10", "11", "12"]
-        for it, monthIter in enumerate(monthsForIter):
-            daysInMonth = monthrange(2020, int(monthIter))
-            hoursInMonth = 24 * daysInMonth[1]  # number of hours in month
-            # define the name of the monthly demand file
-            monthlyDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{monthIter}_profile.pkl")
-            if not os.path.isfile(monthlyDemand_path):
-                dfDemand = loadShapes.iloc[skipRows:hoursInMonth, :]
-                # create index date range
-                if monthIter == "12":
-                    time = pd.date_range(start=f"2020-{monthIter}-01", end="2021-01-01", freq="H")
-                else:
-                    time = pd.date_range(start=f"2020-{monthIter}-01", end=f"2020-{monthsForIter[it + 1]}-01", freq="H")
-                # transform string index into datetime index
-                dfDemand.index = pd.to_datetime(time[:-1])
-                # call method for processing series
-                dfDemand.to_pickle(monthlyDemand_path)
-            else:
-                skipRows += hoursInMonth
-
-    def __load_LoadShapePerMonth(self, month):
-        """load demand per month"""
-        # extract demand
-        monthlyDemand_path = pathlib.Path(self.monthlyDemand_dir).joinpath(f"month_{month}_profile.pkl")
-        if not os.path.isfile(monthlyDemand_path):
-            self.__split_loadShapes(self.__extract_loadShapes())
-        dfDemand = pd.read_pickle(monthlyDemand_path)
-        self.simulation_steps = len(dfDemand)
-        self.demand = dfDemand
-        return dfDemand
-
-    def __set_monitor(self, element_name, element_type, mon_name_prefix, power=True, voltage=True, verbose=False):
-        """Sets a monitor on element_name of element_type"""
-        if(power):  # If power monitor is enabled
-            mon_name = mon_name_prefix + "power"
-            err1 = self.dss.run_command(f"New Monitor.{mon_name} "
-                                        f"Element={element_type}.{element_name} "
-                                        f"terminal=1 PPolar=no mode=1")
-            if(verbose):
-                print("Monitor type: ", mon_name_prefix + "power", " placed on", element_type, " name: ", element_name, "with errors: ", err1)
-
-        if(voltage):
-            mon_name = mon_name_prefix + "voltage"
-            err2 = self.dss.run_command(f"New Monitor.{mon_name} "
-                                        f"Element={element_type}.{element_name} "
-                                        f"terminal=1 vipolar=yes mode=0")
-            if(verbose):
-                print("Monitor type: ", mon_name_prefix + "voltage", " placed on", element_type, " name: ", element_name, "with errors: ", err2)
-
-    def __run_qsts_OpenDSS_duty(self):
+    def __run_native_qsts_duty(self):
         """
-        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataets of voltage magnitudes, complex powers, and currents, for each node
+        Run a "Quasi-Static Time-Series" within OpenDSS and get multivariate 
+        timeseries a dataset of voltage magnitudes, complex powers, and currents based on Monitors.
         """
         # Check QSTS initialization
-        self.__check_qsts_initialization()
+        self.__check_qsts_initialization(native=True)
+
         # Run Duty mode qsts
-        # whole duty
-        self.dss.run_command('solve')
-        voltage_profiles, kw_profiles, kvar_profiles = self.__get_monitor_all_loads()
+        self.run_command('solve')
+
+        # get monitor information
+        voltage_profiles, kw_profiles, kvar_profiles = self.get_monitor_all_loads()
+        lineIjk, linePjk, lineQjk = self.get_monitor_all_lines()
+        trafoIjk, trafoPjk, trafoQjk = self.get_monitor_all_trafos()
         self.__qsts_complete = True
+
+        # load quantities
         self.loadVolts = voltage_profiles
         self.loadKws = kw_profiles
         self.loadKvars = kvar_profiles
 
-    def __set_monitor_all_loads(self, verbose=False):
-        """Sets timeseries power monitors on all loads before solving"""
-        loads = self.dss.Loads.AllNames()
-        for n, load_name in enumerate(loads):
-            mon_name_prefix = "mon_" + str(load_name) + "_"
-            self.__set_monitor(element_name=load_name, element_type="Load",
-                               mon_name_prefix=mon_name_prefix, power=True,
-                               voltage=True, verbose=verbose)
+        # line quantities
+        self.lineIjks = lineIjk
+        self.linePjks = linePjk
+        self.lineQjk = lineQjk
 
-    def __get_monitor_all_loads(self, verbose=False):
-        """Sets timeseries power monitors on all loads before solving"""
-        loads = self.dss.Loads.AllNames()
-        voltage_dict = dict()
-        kw_dict = dict()
-        kvar_dict = dict()
-        for n, load_name in enumerate(loads):
-            volts, kws, kvars = self.__get_monitor_timeseries(element_name=load_name)
-            voltage_dict[load_name + "voltage"] = volts
-            kw_dict[load_name] = kws
-            kvar_dict[load_name] = kvars
-        voltage_profiles = pd.DataFrame.from_dict(voltage_dict)
-        voltage_profiles = voltage_profiles.set_index(self.demand.index)
-        kw_profiles = pd.DataFrame.from_dict(kw_dict)
-        kw_profiles = kw_profiles.set_index(self.demand.index)
-        kvar_profiles = pd.DataFrame.from_dict(kvar_dict)
-        kvar_profiles = kvar_profiles.set_index(self.demand.index)
-        return voltage_profiles, kw_profiles, kvar_profiles
+        # trafo quantities
+        self.trafoIjks = trafoIjk
+        self.trafoPjks = trafoPjk
+        self.trafoQjk = trafoQjk
 
-    def __get_monitor_timeseries(self, element_name, element_type="Load"):
+    #  ##########################################################
+    #  ######### run QSTS for Power Models Distribution #########
+    #  ##########################################################
+
+    def run_PMD_qsts(self):
         """
-        Gets the voltage, active, and reactive power timeseries dictionary for a single elemented in the system:
-        {(V_i,t,P_i,t,Q_i)_t}_{t=1,..,M}
+        This method runs a python-based QSTS simulation for populating PMD time_series dictionary.
 
         Parameters:
         ---
             dss: the dss object
             element: name of the lement
+
         """
-        voltage_ts = self.__export_monitor_voltage(element_name)
-        kw_ts, kvar_ts = self.__export_monitor_power(element_name)
-        return voltage_ts, kw_ts, kvar_ts
+        
+        # run routine with
+        self.__run_PMD_qsts_duty()
 
-    def __export_monitor_voltage(self, element_name):
-        """Gets the voltage timeseries for an element that is monitored"""
-        monitor_name = "mon_" + element_name + "_voltage"
-        # set the active monitor according to name
-        self.dss.Monitors.Name(monitor_name)
-        voltage_matrix = self.dss.Monitors.AsMatrix()  # N timesteps x M chanels (t, 0, v1, angle 1, ... I1, angle1, ...)
-        return voltage_matrix[:, 2]  # interested in v1
+    def __run_PMD_qsts_duty(self):
+        """
+        Run a "Quasi-Static Time-Series" simulation and populate a PMD dictionary 
+        comprising time_series data for each structure, i.e., voltage magnitudes 
+        for buses and active powers for lines, transformers, and loads.
+        """
 
-    def __export_monitor_power(self, element_name):
-        """Gets the active and reactive power timeseries for an element monitored"""
-        monitor_name = "mon_" + element_name + "_power"
-        # set the active monitor according to name
-        self.dss.Monitors.Name(monitor_name)
-        power_matrix = self.dss.Monitors.AsMatrix()  # N timesteps x M chanels (t, 0, P1, Q1, ....)
-        return power_matrix[:, 2], power_matrix[:, 3]
+        # Check QSTS initialization
+        self.__check_qsts_initialization()
+
+        # Create all structures
+        self.create_buses()
+        self.create_lines()
+        self.create_xfmrs()
+        self.create_loads()
+        
+        #Run Duty mode qsts
+        for it in tqdm (range (self.simulation_steps), desc="QSTS running..."):  
+            # run routine one set at a time
+            self.run_command('solve')
+
+            # get electrical quantities at time t
+            self.read_bus_voltages()
+            self.read_line_power()
+            self.read_xfmr_power()
+            self.read_load_power()
+
+
+        self.__qsts_complete=True
