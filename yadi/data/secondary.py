@@ -8,12 +8,13 @@ class DSS_Secondaries(sensitivity.DSS_Sensitivities):
     WIP: "distributed" power flow solves exploiting knowledge of secondary topology
     """
 
-    def __init__(self,redirects,verbose=False) -> None:
+    def __init__(self,redirects,verbose=False,include_lvxformers=True) -> None:
         super().__init__(redirects,verbose)
         #Full size sensitivity matrices with all secondaries
         self.svp = self.get_spv()
         self.svq = self.get_sqv()
         self.secondaries = None #Dictionary of secondary matrices
+        self.include_lvxformers = include_lvxformers
         
     def get_secondary_data(self,n_secondaries = 10):
         """
@@ -100,7 +101,7 @@ class DSS_Secondaries(sensitivity.DSS_Sensitivities):
         """
         
         #Secondaries results dictionary
-        self.secondaries = {}
+        secondaries = {}
 
         #Node names and node names by phase    
         node_names = dss.Circuit.AllNodeNames()
@@ -110,7 +111,7 @@ class DSS_Secondaries(sensitivity.DSS_Sensitivities):
         secondary_names = [str(i) for i in range(1,n_secondaries+1)] #Group index of the secondary names
         
         for sec_name in secondary_names:
-            sec_bus_idx = 0 #Counter for the bus number within the secondary
+            sec_bus_idx = 1 #Counter for the bus number within the secondary
             node_idxs_in_sec,node_names_in_sec = [],[] 
             
             for node_idx,node_name in enumerate(node_names):
@@ -125,22 +126,22 @@ class DSS_Secondaries(sensitivity.DSS_Sensitivities):
                 else:
                     print("no phase for: {node_name}".format(node_name=node_name))
                     phase = ""
-                    
-
 
                 if('sec' + sec_name + "_" in node_name): #Hacky way to separate by node name
                     node_idxs_in_sec.append(node_idx)
-                    node_names_in_sec.append('sec' + sec_name + "_" + str(sec_bus_idx))
+                    node_names_in_sec.append('s' + sec_name + "_" + str(sec_bus_idx) + "_"+phase)
                     #Increment the secondary bus index counter
                     sec_bus_idx += 1
-                elif("trafo" + sec_name + "lv" in node_name): #Catch low voltage transformers
+                elif(self.include_lvxformers == True and ("trafo" + sec_name + "lv" in node_name)): #Catch low voltage transformers
                     node_idxs_in_sec.append(node_idx)
-                    node_names_in_sec.append('sec' + sec_name + "_" + "xfmrlv")
-            self.secondaries['sec' + sec_name] = {
+                    node_names_in_sec.append('s' + sec_name + "_" + "xfmrlv"+ "_"+phase)
+            secondaries['sec' + sec_name] = {
                 "node_idxs":node_idxs_in_sec,
                 "node_names":node_names_in_sec
             }
-        return self.secondaries         
+        self.secondaries = secondaries
+        return secondaries         
+
      
 
 def calc_vph_active_sensitivities(Y,vph):

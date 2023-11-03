@@ -60,9 +60,11 @@ class DSS_Data:
             self.compile_dss()
         
 
-    def compile_dss(self):
+    def compile_dss(self,redirects=None):
         """Compiles the DSS redirect files input into the object"""
-        for redirect in self.redirects:
+        if redirects is None:
+            redirects = self.redirects
+        for redirect in redirects:
             self.redirect(redirect)
             self.run_command('solve')
         self.num_compilations += 1

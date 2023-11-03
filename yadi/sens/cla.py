@@ -42,14 +42,14 @@ class CLA:
         constraints = []
         if ub is not None or lb is not None:               
             if ub is not None:
-                constraints.append(X@a + b <= ub)
+                constraints.append(X@a + b*np.ones(m) <= ub)
             if lb is not None:
-                constraints.append(X@a + b >= lb)
+                constraints.append(X@a + b*np.ones(m) >= lb)
         else:
             warnings.warn("No upper or lower bounds specified. Using unconstrained approximation.")
 
         # Define and solve the problem        
-        obj = cp.norm(Y - (X@a + b),1)
+        obj = cp.norm(Y - (X@a + b*np.ones(m)),1)
         prob = cp.Problem(cp.Minimize(obj),constraints)
         prob.solve(
             solver=self.solver,
