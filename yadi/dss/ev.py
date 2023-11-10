@@ -5,7 +5,7 @@ May 24th, 2022
 """
 import yadi.dss.model as model 
 import yadi.sens.model_perturb as perturb
-import jax.numpy as jnp
+import numpy as np
 
 #Optional: Turn off complex value warnings
 #warnings.simplefilter("ignore", np.ComplexWarning)
@@ -22,7 +22,7 @@ class DSS_EV(perturb.DSS_Sensitivities):
         Predict the EV hosting capacity (maximum amount of demand) for each node 
         """
         n_nodes = len(nodes)
-        eta = jnp.zeros_like(n_nodes)
+        eta = np.zeros_like(n_nodes)
         if(self.unity_pf):
             svp_res = self.get_svp()
             svp = svp_res["matrix"]

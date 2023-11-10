@@ -9,7 +9,7 @@ October 6th, 2021
 from tkinter import W
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.voltage_source as voltage_source 
+import yadi.dss.voltage_source as voltage_source 
 import warnings
 from tqdm import tqdm
 import pathlib
@@ -157,7 +157,7 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         #Check QSTS initialization
         #self.__check_qsts_initialization()
         self.compile_dss()
-        self.initialize_qsts()
+        self.initialize_qsts(native=False)
 
         # All electircal nodes in the system - includes all individual conductors/phases
         nodes = self.dss.Circuit.YNodeOrder()

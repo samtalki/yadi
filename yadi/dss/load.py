@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.shunt as shunt 
+import yadi.dss.shunt as shunt 
 import os
 
 

@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.transformer as transformer 
+import yadi.dss.transformer as transformer 
 import os
 
 

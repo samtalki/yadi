@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.line_code as line_code 
+import yadi.dss.line_code as line_code 
 import os
 
 

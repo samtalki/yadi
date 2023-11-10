@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.model as model 
+import yadi.dss.model as model 
 import os
 
 

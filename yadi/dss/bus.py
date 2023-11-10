@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.load_shape as load_shape 
+import yadi.dss.load_shape as load_shape 
 import os
 
 

@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.line as line 
+import yadi.dss.line as line 
 import math
 import os
 

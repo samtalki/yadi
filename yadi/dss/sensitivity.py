@@ -1,7 +1,6 @@
 """
 Model-based perturb-and-observed sensitivity model extending OpenDSS
 @author: Samuel Talkington
-Advanced Computational Electricity Systems (ACES) Lab
 Georgia Institute of Technology
 All Rights Reserved
 10.6.2021

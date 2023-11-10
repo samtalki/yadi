@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-import yadi.yadi.dss.bus as bus 
+import yadi.dss.bus as bus 
 import math
 import os
 
