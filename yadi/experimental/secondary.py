@@ -1,6 +1,7 @@
+# Experimental: incomplete research code, API may change.
 import numpy as np
-import opendssdirect as dss
 import yadi.dss.sensitivity as sensitivity
+from yadi.dss._binding import dss
 
 
 class DSS_Secondaries(sensitivity.DSS_Sensitivities):

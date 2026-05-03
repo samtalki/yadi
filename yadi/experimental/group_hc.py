@@ -1,4 +1,5 @@
-#Data-driven hosting capacity analysis for groups
+# Experimental: incomplete research code, API may change.
+# Data-driven hosting capacity analysis for groups
 # Compute an N-dimensional vector of nodal hosting capacities eta
 import jax.numpy as jnp
 from jax import jit,grad,vmap

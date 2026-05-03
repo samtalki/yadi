@@ -1,15 +1,11 @@
-
-import numpy as np
 import pandas as pd
-import yadi.dss.bus as bus 
-import math
-import os
+
+import yadi.dss.bus as bus
 
 
 class DSS_Line(bus.DSS_Bus):
-
     def __init__(self, redirects, precompile, verbose=False):
-        """"
+        """ "
         Class for handling lines in OpenDSS.
         """
 
@@ -17,10 +13,10 @@ class DSS_Line(bus.DSS_Bus):
 
     def create_lines(self):
 
-        # initialize line container 
-        self.branches = [] 
+        # initialize line container
+        self.branches = []
 
-        # set first line as active 
+        # set first line as active
         line_idx, line = 0, self.dss.Lines.First()
 
         while line:
@@ -54,7 +50,7 @@ class DSS_Line(bus.DSS_Bus):
             for ni, nj in zip(f_bus_nodes, t_bus_nodes):
                 nodes.append(f"{ni}-{nj}")
 
-            # build dictionary with required data for visualization    
+            # build dictionary with required data for visualization
             line = {
                 "uid": ln,
                 "transformer": False,
@@ -91,15 +87,12 @@ class DSS_Line(bus.DSS_Bus):
             self.branches.append(line)
 
             line = self.dss.Lines.Next()
-            line_idx += 1 #increment index
-
+            line_idx += 1  # increment index
 
     def read_line_power(self):
 
         for line in self.branches:
-
             if not line["transformer"]:
-
                 # get line uid
                 uid = line["uid"]
 
@@ -119,14 +112,14 @@ class DSS_Line(bus.DSS_Bus):
 
                 # create voltage magnitude container for each line-terminal combination
                 for n, node in enumerate(nodes):
-                    line["pij"][f"{node}"].append(p[n]) 
-                    line["pji"][f"{node}"].append(p[int(len(p)/2) + n]) 
-                    line["qij"][f"{node}"].append(q[n]) 
-                    line["qji"][f"{node}"].append(q[int(len(q)/2) + n]) 
-                    line["ir_ij"][f"{node}"].append(ir[n]) 
-                    line["ii_ij"][f"{node}"].append(ii[n]) 
-                    line["ir_ji"][f"{node}"].append(ir[int(len(p)/2) + n]) 
-                    line["ii_ji"][f"{node}"].append(ii[int(len(p)/2) + n]) 
+                    line["pij"][f"{node}"].append(p[n])
+                    line["pji"][f"{node}"].append(p[int(len(p) / 2) + n])
+                    line["qij"][f"{node}"].append(q[n])
+                    line["qji"][f"{node}"].append(q[int(len(q) / 2) + n])
+                    line["ir_ij"][f"{node}"].append(ir[n])
+                    line["ii_ij"][f"{node}"].append(ii[n])
+                    line["ir_ji"][f"{node}"].append(ir[int(len(p) / 2) + n])
+                    line["ii_ji"][f"{node}"].append(ii[int(len(p) / 2) + n])
 
     def get_lineEAmps(self):
         "Method to extract line emergency amps"

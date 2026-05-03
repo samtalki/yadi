@@ -1,3 +1,4 @@
+# Experimental: incomplete research code, API may change.
 #---
 # General purpose linear sensitivity model in Jax for any steady-state time series electrical network.
 # 

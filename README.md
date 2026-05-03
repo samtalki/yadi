@@ -1,85 +1,63 @@
-
 ![yadi](assets/logo/yadi_logo_clear_purple_tilt.png)
 
-# ``yadi``: yet another DSS interface.
-`yadi` is software designed to help you tame the black magic that is distribution network models and make decisions with distribution network measurement data. It is primarily built on the [OpenDSS Electric Distribution System Simulator](https://smartgrid.epri.com/SimulationTool.aspx), which is [available for download here](https://sourceforge.net/projects/electricdss/files/) by its authors, the Electric Power Research Institute. We interface with OpenDSS via [opendssdirect.py](https://github.com/dss-extensions/OpenDSSDirect.py) and PyDSS. 
+# yadi
 
+Research workflows for distribution network analysis on top of [OpenDSSDirect.py](https://github.com/dss-extensions/OpenDSSDirect.py). yadi adds sensitivity analysis, hosting capacity, and AMI dataset generation on top of a cross-platform OpenDSS binding.
+
+## Install
+
+```bash
+uv sync                       # install runtime + dev deps
+uv sync --extra research      # add the optional JAX/sklearn stack used by experimental modules
+```
+
+`uv` ([install instructions](https://docs.astral.sh/uv/getting-started/installation/)) is the supported tool. `pip install -e ".[dev,research]"` also works for users who don't want uv.
 
 ## Quickstart
 
-### Setting up your environment
-`yadi` uses [Poetry](https://python-poetry.org/). 
+```python
+from yadi import DSS_Data
 
-1. Ensure that Poetry is installed. [Follow the instructions for your operating system here.](https://python-poetry.org/docs/basic-usage/)
-2. Clone the repository.
-3. Navigate to the root directory.
-4. While in the root directory, spawn and activate a virtual environment for this project with the command 
-`poetry shell`
-5. Install the dependencies with 
-`poetry install`
-6. Confirm that `yadi` is installed in your virtual environment with
-`pip show yadi`
+d = DSS_Data("test_cases/13Bus/IEEE13Nodeckt.dss", verbose=False)
+print(d.dss.Circuit.Name())
+print(d.dss.Circuit.AllBusMagPu())
+```
 
-### Optional: accessing the virtual envrionment with VS Code
-If you use VS Code, after following the above steps, and ensuring that your environment is activated, you can access the virtual environment for ``yadi`` within by running: 
-``code .``
-within  your poetry shell. You can then select the yadi environment as your python interpreter in the lower right.
+For more, see [`examples/`](examples/) (quickstart, QSTS dataset, perturb-and-observe sensitivities, local hosting capacity).
 
+## What yadi adds on top of OpenDSSDirect.py
 
-## Why `yadi`?
+- `yadi.dss.DSS_Sensitivities` — perturb-and-observe sensitivity matrices `S_vp`, `S_vq`, `S_θp`, `S_θq`.
+- `yadi.dss.DSS_Timeseries` — quasi-static time series (QSTS) dataset orchestration: voltages, complex powers, currents, line/transformer flows.
+- `yadi.hc.DSS_VC_HCA` — model-based voltage-constrained hosting capacity.
+- `yadi.hc.measurement.local` — AMI-based hosting capacity pipeline using regression sensitivities.
+- `yadi.sens.CLA` — conservative linear approximation via constrained l1 regression.
+- `yadi.data.AMIData` — HDF5 ingestion for finite-difference workflows on real meter data.
 
-The distribution network modeling community is hiding from modern data science workflows. Many distribution researchers simply implement the same algorithms idiosyncratically over and over again, which has ***severely* limited** the ability of the power system community to develop higher-order iterations of network model analysis tools and algorithms. `yadi` makes it significantly easier to ask the kind of research questions that are useful for the modern, data-driven eletric power system engineer.
+## Where yadi sits in the ecosystem
 
-`yadi` doesn't stop with making OpenDSS friendlier for modern data science workflows. It also welcomes the [Julia programming language](https://julialang.org/) and its benefits with open arms, and liberally makes uses of `PowerModelsDistribution.jl` in tandem with `OpenDSSDirect.jl` in accordance with each of their strengths. Taking advantage of Julia's speed can allow for sophisticated optimization, decision making, and control algorithms that are not possible in Python alone.
+yadi is a research-workflow layer; both `OpenDSSDirect.py` and EPRI's `py_dss_interface` are DSS binding layers with different distributions and API styles. yadi currently uses `OpenDSSDirect.py` for cross-platform reach (Apple Silicon support exists today). Migration to `py_dss_interface` is the planned next step once it ships macOS binaries — the binding is isolated to [`yadi/dss/_binding.py`](yadi/dss/_binding.py) plus the wrapper layer in `yadi/dss/*.py` to keep that change contained and auditable.
 
-### What is this good for?
+## Test cases
 
+Sample feeders live in [`test_cases/`](test_cases/) — small balanced/unbalanced 3-bus networks, the IEEE 13-bus benchmark, and several transformer test cases.
 
-`yadi` is designed to help you **create data for machine learning applications**. It is designed to help you solve problems like:
-- How can I generate a dataset of *measurements* that I can use to train a machine learning algorithm?
-- How can I create a matrix of sensitivities for a distribution network model?
+## Status
 
-`yadi` is designed to help you **answer questions about distribution network models**. It is designed to help you answer questions like:
-- What is the impact of electric vehicle charging on my distribution network?
-- How much solar can I add to my distribution network?
-- How can I use my distribution network to provide ancillary services to the transmission network?
+- **Stable:** `yadi.dss`, `yadi.sens`, `yadi.hc`, `yadi.data`. Tested in CI on macOS 14 and Ubuntu, Python 3.11/3.12.
+- **Experimental:** `yadi.experimental` — incomplete research code (JAX sensitivity model, group HC, secondary-network solver). API may change.
 
+## Citation
 
+```bibtex
+@misc{talkington2024yadi,
+  author = {Samuel Talkington and Alejandro Owen and Alex Reyna and Jorge Fernandez},
+  title  = {yadi: research workflows for distribution network analysis},
+  year   = {2024},
+  note   = {https://github.com/samtalki/yadi}
+}
+```
 
-### Features
-``yadi`` gives you a number of tools to improve your distribution system research and accelerate the integration of OpenDSS into your studies. ``yadi`` aims to provide a **fresh, modern, open-source approach to the mostly opaque world of distribution network modeling** with support for several common algorithms that are central to modern distribution systems research. Below, we summarize some of these features, although it is always a work in progress. Check back in the future for more, or open an issue or pull request. 
+## Acknowledgement
 
-#### Turnkey network model analysis tools
-1. Simplified circuit data access, collection, and analysis
-2. Time series analysis
-3. Sensitivity analysis
-5. Electric vehicle analysis
-6. Iterative hosting capacity analysis
-
-#### Turnkey measurement-based/sample-based/model-free models for the power flow equations
-1. Quasi-static time-series (QSTS) dataset generation with user-controllable parameters
-2. Regression-based sensitivity analysis
-3. Sensitivity-based hosting capacity generation analysis
-4. Sensitivity-based hosting capacity demand analysis
-
-## FAQ/Additional benefits:
-
-Not convinced? Here's some more info.
-
-### Main benefits:
-1. Focus on data-driven/machine learning applications
-2. Cross-platform and compatibility with opendssdirect.py
-3. Local OpenDSS installation not necessarily required
-
-
-## Contributors
-### Georgia Tech
-- Samuel Talkington 
-- Alejandro Owen (conservative linear approximations)
-- Alex Reyna
-- Jorge Fernandez (admittance matrix & initialization in dss/model.py)
-
-New contributors are always welcome.
-
-## Acknowledgement 
-This material is based upon work supported by the National Science Foundation Graduate Research Fellowship under Grant No. DGE-2039655. Any opinion, findings, and conclusions or recommendations expressed in this material are those of the authors(s) and do not necessarily reflect the views of the National Science Foundation.
+This material is based upon work supported by the National Science Foundation Graduate Research Fellowship under Grant No. DGE-2039655. Any opinion, findings, and conclusions or recommendations expressed in this material are those of the authors and do not necessarily reflect the views of the National Science Foundation.
