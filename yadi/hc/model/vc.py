@@ -29,7 +29,7 @@ class DSS_VC_HCA(model.DSS_Data):
         self.pfs = np.ones(self.n_nodes)
 
     def get_iterative_hc(self, pfs: np.ndarray | None = None) -> np.ndarray:
-        """Return the vector of maximum kW hosting capacities for each node under `v_max`."""
+        """Per node injection headroom in positive kW under `v_max`; 0 if no kW violates the cap."""
         if pfs is not None:
             self.pfs = pfs
 
@@ -52,7 +52,9 @@ class DSS_VC_HCA(model.DSS_Data):
                 )
                 vpu_perturbed = np.asarray(self.dss.Circuit.AllBusMagPu())
                 if np.any(vpu_perturbed[sub_overvoltage_idx] > self.v_max):
-                    hc[node_idx] = kw_inj
+                    # kw_inj is the load convention sweep value (negative = generation);
+                    # report HC as positive kW of injection headroom.
+                    hc[node_idx] = -kw_inj
                     break
         return hc
 

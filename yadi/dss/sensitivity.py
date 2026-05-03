@@ -12,7 +12,13 @@ _PERTURB_KVAR = 100.0
 
 
 class DSS_Sensitivities(model.DSS_Data):
-    """Compute perturb and observe sensitivity matrices."""
+    """Perturb and observe sensitivity matrices using the injection sign convention.
+
+    A perturbation of `_PERTURB_KW` kW of generation (or kvar of injection) is placed at
+    each node in turn; the divisor matches that magnitude exactly. Output units are
+    pu/kW with `per_unit=True` (default), or V/kW with `per_unit=False`. Diagonal
+    entries of `Svp` are non negative on a typical radial network.
+    """
 
     def __init__(
         self,

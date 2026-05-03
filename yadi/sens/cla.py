@@ -11,7 +11,7 @@ class CLA:
         self,
         verbose: bool = True,
         maxiters: int = 1000,
-        solver: str = "SCS",
+        solver: str = "CLARABEL",
     ) -> None:
         self.verbose = verbose
         self.maxiters = maxiters
@@ -48,7 +48,9 @@ class CLA:
 
         obj = cp.norm(Y - (X @ a + b), 1)
         prob = cp.Problem(cp.Minimize(obj), constraints)
-        prob.solve(solver=self.solver, verbose=self.verbose, max_iters=self.maxiters)
+        # CLARABEL spells the iteration cap `max_iter`; SCS uses `max_iters`.
+        iter_kw = "max_iter" if self.solver == "CLARABEL" else "max_iters"
+        prob.solve(solver=self.solver, verbose=self.verbose, **{iter_kw: self.maxiters})
 
         if a.value is None or b.value is None:
             raise RuntimeError(f"CLA solver did not return a value (status: {prob.status}).")
