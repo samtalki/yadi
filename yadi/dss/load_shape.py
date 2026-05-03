@@ -1,39 +1,28 @@
+import os
+from calendar import monthrange
+
 import numpy as np
 import pandas as pd
-import yadi.dss.monitor as monitor 
-from calendar import monthrange
-import os
+
+import yadi.dss.monitor as monitor
+
 
 class DSS_LoadShape(monitor.DSS_Monitor):
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
-    def __init__(self, redirects, precompile, verbose=False):
-        """"
-        Class for handling LoadShapes in OpenDSS.
-
-        """
-        super().__init__(redirects, redirects, precompile)
-
-    def set_loadshape(self,loadshape_path,loadshape_name='loadshape1'):
+    def set_loadshape(self, loadshape_path, loadshape_name="loadshape1"):
         """
         Sets a loadshape for all loads
         """
-        self.dss.run_command(
-            "Redirect {loadshape_path}".format(
-                loadshape_path = loadshape_path
-            )
-        )
-        self.dss.run_command(
-            "batchedit load..*  yearly={loadshape_name} ".format(
-                loadshape_name=loadshape_name
-            )
-            
-        ) #change all loads            
-    
+        self.dss.Text.Command(f"Redirect {loadshape_path}")
+        self.dss.Text.Command(f"batchedit load..*  yearly={loadshape_name} ")  # change all loads
+
     def setAllLoadShapes(self, kwLoadShapes, kvarLoadShapes):
         "Method to modify loadShapes from a DSS file"
         loadShapeNames = self.dss.LoadShape.AllNames()
         for n, loadShapeName in enumerate(loadShapeNames):
-            if loadShapeName == 'default':
+            if loadShapeName == "default":
                 continue
             # extract profiles
             if loadShapeName in kwLoadShapes.columns:
@@ -58,17 +47,14 @@ class DSS_LoadShape(monitor.DSS_Monitor):
             # Qmult = self.dss.LoadShape.QMult()
 
     def __modifyLoadShapeP(self, Pmult, name):
-        self.dss.run_command(f"edit loadshape.{name} "
-                             f"npts={len(Pmult)} "
-                             f"mult={Pmult} "
-                             "UseActual=False")
+        self.dss.Text.Command(
+            f"edit loadshape.{name} npts={len(Pmult)} mult={Pmult} UseActual=False"
+        )
 
     def __modifyLoadShapePQ(self, Pmult, Qmult, name):
-        self.dss.run_command(f"edit loadshape.{name} "
-                             f"npts={len(Pmult)} "
-                             f"mult={Pmult} "
-                             f"qmult={Qmult} "
-                             "UseActual=True")
+        self.dss.Text.Command(
+            f"edit loadshape.{name} npts={len(Pmult)} mult={Pmult} qmult={Qmult} UseActual=True"
+        )
 
     def __extract_loadShapes(self):
         """extract loadshapes from dss file"""
@@ -76,7 +62,7 @@ class DSS_LoadShape(monitor.DSS_Monitor):
         kwLoadShape_dict = dict()
         kvarLoadShape_dict = dict()
         for n, loadShapeName in enumerate(loadShapeNames):
-            if loadShapeName == 'default':
+            if loadShapeName == "default":
                 continue
             # set active loadshape using its name
             self.dss.LoadShape.Name(loadShapeName)
@@ -98,28 +84,33 @@ class DSS_LoadShape(monitor.DSS_Monitor):
         kwLoadShapes = loadShapes[0]
         kvarLoadShapes = loadShapes[1]
         skipRows = 0
-        monthsForIter = ["01", "02", "03", "04", "05", "06",
-                         "07", "08", "09", "10", "11", "12"]
+        monthsForIter = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
         for it, monthIter in enumerate(monthsForIter):
             daysInMonth = monthrange(2019, int(monthIter))
             hoursInMonth = 24 * daysInMonth[1]  # number of hours in month
             # define the name of the monthly demand file
             kwDemand_path = os.path.join(self.monthlyDemand_dir, f"month_{monthIter}_kwProfile.pkl")
-            kvarDemand_path = os.path.join(self.monthlyDemand_dir, f"month_{monthIter}_kvarProfile.pkl")
+            kvarDemand_path = os.path.join(
+                self.monthlyDemand_dir, f"month_{monthIter}_kvarProfile.pkl"
+            )
             if not os.path.isfile(kwDemand_path):
                 if monthIter == "12":
                     kwDemand = kwLoadShapes.iloc[skipRows:, :]
                     kvarDemand = kvarLoadShapes.iloc[skipRows:, :]
                     # create index date range
-                    time = pd.date_range(start=f"2019-{monthIter}-01", end="2020-01-01", freq="H")
+                    time = pd.date_range(start=f"2019-{monthIter}-01", end="2020-01-01", freq="h")
                 else:
-                    kwDemand = kwLoadShapes.iloc[skipRows:skipRows + hoursInMonth, :]
-                    kvarDemand = kvarLoadShapes.iloc[skipRows:skipRows + hoursInMonth, :]
+                    kwDemand = kwLoadShapes.iloc[skipRows : skipRows + hoursInMonth, :]
+                    kvarDemand = kvarLoadShapes.iloc[skipRows : skipRows + hoursInMonth, :]
                     # create index date range
-                    time = pd.date_range(start=f"2019-{monthIter}-01", end=f"2019-{monthsForIter[it + 1]}-01", freq="H")
+                    time = pd.date_range(
+                        start=f"2019-{monthIter}-01",
+                        end=f"2019-{monthsForIter[it + 1]}-01",
+                        freq="h",
+                    )
                 # transform string index into datetime index
-                kwDemand.index = pd.to_datetime(time[:len(kwDemand)])
-                kvarDemand.index = pd.to_datetime(time[:len(kvarDemand)])
+                kwDemand.index = pd.to_datetime(time[: len(kwDemand)])
+                kvarDemand.index = pd.to_datetime(time[: len(kvarDemand)])
                 # call method for processing series
                 kwDemand.to_pickle(kwDemand_path)
                 kvarDemand.to_pickle(kvarDemand_path)
@@ -130,7 +121,7 @@ class DSS_LoadShape(monitor.DSS_Monitor):
     def __load_LoadShapePerMonth(self, month):
         """load demand per month"""
         # extract demand
-        kwDemand_path =   os.path.join(self.monthlyDemand_dir, f"month_{month}_kwProfile.pkl")
+        kwDemand_path = os.path.join(self.monthlyDemand_dir, f"month_{month}_kwProfile.pkl")
         kvarDemand_path = os.path.join(self.monthlyDemand_dir, f"month_{month}_kvarProfile.pkl")
         if not os.path.isfile(kwDemand_path):
             self.__split_loadShapes(self.__extract_loadShapes())
@@ -140,4 +131,3 @@ class DSS_LoadShape(monitor.DSS_Monitor):
         # self.kwDemand = kwDemand
         # self.kvarDemand = kvarDemand
         return kwDemand, kvarDemand
-

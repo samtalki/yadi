@@ -1,28 +1,18 @@
-import numpy as np
-import pandas as pd
-import yadi.dss.load_shape as load_shape 
-import os
+import yadi.dss.load_shape as load_shape
 
 
 class DSS_Bus(load_shape.DSS_LoadShape):
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
-    def __init__(self, redirects, precompile, verbose=False):
-        """"
-        Class for handling buses in OpenDSS.
-
-        """
-
-        super().__init__(redirects, redirects, precompile)
-    
     def create_buses(self):
 
-        # initialize bus container 
-        self.buses = [] 
+        # initialize bus container
+        self.buses = []
         self.names_to_buses = {}
 
         # iterate over all bus names
         for bn in self.dss.Circuit.AllBusNames():
-
             # set active bus
             self.dss.Circuit.SetActiveBus(bn)
 
@@ -36,7 +26,7 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             # get bus nodes/terminals
             nodes = self.dss.Bus.Nodes()
 
-            # build dictionary with required data for visualization    
+            # build dictionary with required data for visualization
             bus = {
                 "uid": bn,
                 "x": x,
@@ -59,7 +49,6 @@ class DSS_Bus(load_shape.DSS_LoadShape):
     def read_bus_voltages(self):
 
         for bus in self.buses:
-
             # get name
             uid = bus["uid"]
 
@@ -70,16 +59,16 @@ class DSS_Bus(load_shape.DSS_LoadShape):
             voltages = self.dss.Bus.VMagAngle()
 
             # get voltage magnitudes and angles
-            vm = voltages[0::2] 
-            va = voltages[1::2] 
+            vm = voltages[0::2]
+            va = voltages[1::2]
 
             # get bus nodes/terminals
             terminals = self.dss.Bus.Nodes()
 
             # create voltage magnitude container for each bus-terminal combination
             for i, node in enumerate(terminals):
-                bus["vm"][f"{node}"].append(vm[i]) 
-                bus["va"][f"{node}"].append(va[i]) 
+                bus["vm"][f"{node}"].append(vm[i])
+                bus["va"][f"{node}"].append(va[i])
 
     def write_PMD_bus(self):
 
@@ -91,7 +80,6 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
         # main loop
         for bn in bus_names:
-
             # set bus as active
             self.dss.Circuit.SetActiveBus(bn)
 
@@ -110,11 +98,10 @@ class DSS_Bus(load_shape.DSS_LoadShape):
 
             # create structure
             self.bus[bn] = {
-            "terminals"   : terminals,
-            "grounded"    : grounded,
-            "rg"          : rg,
-            "xg"          : xg,
-            "status"      : "ENABLED",
-            "time_series" : {},
+                "terminals": terminals,
+                "grounded": grounded,
+                "rg": rg,
+                "xg": xg,
+                "status": "ENABLED",
+                "time_series": {},
             }
-

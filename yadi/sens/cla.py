@@ -1,83 +1,77 @@
-## Conservative linear approximations
-import yadi.dss.model as model
-import opendssdirect as dss
-import numpy as np
+"""Conservative linear approximation via l1 regression with optional inequality constraints."""
+
+import warnings
+
 import cvxpy as cp
-import warnings 
+import numpy as np
+
 
 class CLA:
-    """
-    Conservative linear approximation : regression within bounds 
-    """
-
-    def __init__(self,verbose=True,maxiters=1000,solver="SCS") -> None:
+    def __init__(
+        self,
+        verbose: bool = True,
+        maxiters: int = 1000,
+        solver: str = "CLARABEL",
+    ) -> None:
         self.verbose = verbose
-        self.maxiters=maxiters
-        self.solver=solver
-        self.params = (None,None) # parameters of the linear approximation 
-        self.intercept = None # intercept of the linear approximation
-        self.dvp = None # sensitivity of vmag wrt active power
-        self.dvq = None # sensitivity of vmag wrt reactive power
-        self.dv2p = None # sensitivity of vmag^2 wrt active power
-        self.dv2q = None # sensitivity of vmag^2 wrt reactive power
+        self.maxiters = maxiters
+        self.solver = solver
+        self.params: tuple[np.ndarray | None, np.ndarray | None] = (None, None)
+        self.intercept: np.ndarray | None = None
+        self.dvp: np.ndarray | None = None
+        self.dvq: np.ndarray | None = None
+        self.dv2p: np.ndarray | None = None
+        self.dv2q: np.ndarray | None = None
 
-    def fit(self,X,Y,ub=False,lb=False):
-        """
-        Make the conservative linear approximation model.
-        The program is a constrained l1-norm approximation problem.
-        Parameters:
-            - X (np.array): matrix of independent variables
-            - Y (np.array): matrix of dependent variables
-            - ub (np.array): upper bounds for the approximation (if CLA is an underestimate)
-            - lb (np.array): lower bounds for the approximation (if CLA is an overestimate)
-        """
-        (m,n) = X.shape
-        assert m==Y.shape[0], "X and Y must have the same number of rows"
+    def fit(
+        self,
+        X: np.ndarray,
+        Y: np.ndarray,
+        ub: np.ndarray | None = None,
+        lb: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Solve `min ||Y - (X a + b)||_1` subject to `lb <= X a + b <= ub` and return `(a, b)`."""
+        m, n = X.shape
+        assert m == Y.shape[0], "X and Y must have the same number of rows"
 
-        # Define the variables
-        a = cp.Variable(n) # coefficients
-        b = cp.Variable(1) # intercept
-        # Define the constraints
-        
+        a = cp.Variable(n)
+        b = cp.Variable(1)
+
         constraints = []
-        if ub is not None or lb is not None:               
+        if ub is not None or lb is not None:
             if ub is not None:
-                constraints.append(X@a + b <= ub)
+                constraints.append(X @ a + b <= ub)
             if lb is not None:
-                constraints.append(X@a + b >= lb)
+                constraints.append(X @ a + b >= lb)
         else:
             warnings.warn("No upper or lower bounds specified. Using unconstrained approximation.")
 
-        # Define and solve the problem        
-        obj = cp.norm(Y - (X@a + b),1)
-        prob = cp.Problem(cp.Minimize(obj),constraints)
-        prob.solve(
-            solver=self.solver,
-            verbose=self.verbose,
-            max_iters=self.maxiters)
+        obj = cp.norm(Y - (X @ a + b), 1)
+        prob = cp.Problem(cp.Minimize(obj), constraints)
+        # CLARABEL spells the iteration cap `max_iter`; SCS uses `max_iters`.
+        iter_kw = "max_iter" if self.solver == "CLARABEL" else "max_iters"
+        prob.solve(solver=self.solver, verbose=self.verbose, **{iter_kw: self.maxiters})
 
-        return a.value,b.value # return the coefficients and intercept
-        
+        if a.value is None or b.value is None:
+            raise RuntimeError(f"CLA solver did not return a value (status: {prob.status}).")
+        return a.value, b.value
 
-    def fit_pq(self,P,Q,V,ub=None,lb=None):
-        """
-        Make a conservative linear approximation of the relationship between a quantity and P,Q
-        Parameters:
-            - V (np.array): (M x 1) matrix of vmag^2 values
-            - P (np.array): (M x n) matrix of active power values
-            - Q (np.array): (M x n) matrix of reactive power values
-        """
-        (m,n) = P.shape
-        (mQ,nQ) = Q.shape
-        assert m==mQ, "P and Q must have the same number of rows"
-        assert m==V.shape[0], "V must have the same number of rows as P and Q"
+    def fit_pq(
+        self,
+        P: np.ndarray,
+        Q: np.ndarray,
+        V: np.ndarray,
+        ub: np.ndarray | None = None,
+        lb: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Fit V against `[P | Q]` and split the coefficients into `(dv2p, dv2q, intercept)`."""
+        m, n = P.shape
+        mQ, _ = Q.shape
+        assert m == mQ, "P and Q must have the same number of rows"
+        assert m == V.shape[0], "V must have the same number of rows as P and Q"
 
-        a,b = self.fit(
-            np.hstack((P,Q)),
-            V,
-            ub=ub,
-            lb=lb)
+        a, b = self.fit(np.hstack((P, Q)), V, ub=ub, lb=lb)
         self.dv2p = a[:n]
         self.dv2q = a[n:]
         self.intercept = b
-        return self.dv2p,self.dv2q,self.intercept
+        return self.dv2p, self.dv2q, self.intercept

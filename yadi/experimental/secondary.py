@@ -1,0 +1,275 @@
+# Experimental: incomplete research code, API may change.
+import numpy as np
+import yadi.dss.sensitivity as sensitivity
+from yadi.dss._binding import dss
+
+
+class DSS_Secondaries(sensitivity.DSS_Sensitivities):
+    """
+    WIP: "distributed" power flow solves exploiting knowledge of secondary topology
+    """
+
+    def __init__(self,redirects,verbose=False) -> None:
+        super().__init__(redirects,verbose)
+        #Full size sensitivity matrices with all secondaries
+        self.svp = self.get_spv()
+        self.svq = self.get_sqv()
+        self.secondaries = None #Dictionary of secondary matrices
+        
+    def get_secondary_data(self,n_secondaries = 10):
+        """
+        Make slices of the node indexes of the currently loaded opendss feeder mapping to the secondary networks
+        Params:
+            n_secondaries: Number of secondary groups in the feeder
+        """
+        #node_names = dss.Circuit.AllNodeNames()[33:]
+        self.secondary_data = {}
+        node_names = dss.Circuit.AllNodeNames()
+        sec_idxs = [str(i) for i in range(1,n_secondaries+1)] #Group index of the secondary names
+        for sec_idx in sec_idxs:
+            node_idxs_in_sec,node_names_in_sec = [],[] 
+            for node_idx,node_name in enumerate(node_names):
+                if('sec' + sec_idx + "_" in node_name): #Hacky way to separate by node name
+                    node_idxs_in_sec.append(node_idx)
+                    node_names_in_sec.append(node_name)
+            self.secondary_data['sec' + sec_idx] = {
+                "node_idxs":node_idxs_in_sec,
+                "node_names":node_names_in_sec
+            }
+        return self.secondary_data         
+
+    def make_sensitivities_secondaries(self,n_secondaries=10):
+        """
+        Construct the sensitivity matrices for all of the secondary groupings created by get_secondary_data
+        """
+        secondary_data = self.get_secondary_data()
+        svp0,svq0 = self.svp['matrix'],self.svq['matrix']
+        for S in [svp0,svq0]:
+            for i,(sec_name,d) in enumerate(secondary_data.items()): 
+                #Make the secondary sensitivity matrix
+                node_idxs = d["node_idxs"]
+                sec_S = S[np.ix_(node_idxs,node_idxs)]
+                secondary_data[sec_name]["S"] = sec_S #save
+        return None
+
+    def make_secondaries(self,Ynet,n_secondaries = 10):
+        """
+        Make slices of the node indexes of the currently loaded opendss feeder mapping to the secondary networks
+        Params:
+            Ynet: nodal admittance matrix
+            n_secondaries: Number of secondary groups in the feeder
+        """
+        #node_names = dss.Circuit.AllNodeNames()[33:]
+        secondaries = {}
+        node_names = dss.Circuit.AllNodeNames()
+        sec_idxs = [str(i) for i in range(1,n_secondaries+1)] #Group index of the secondary names
+        for sec_idx in sec_idxs:
+            node_idxs_in_sec,node_names_in_sec = [],[] 
+            for node_idx,node_name in enumerate(node_names):
+                if('sec' + sec_idx + "_" in node_name): #Hacky way to separate by node name
+                    node_idxs_in_sec.append(node_idx)
+                    node_names_in_sec.append(node_name)
+            #Make secondary ybus
+            Ysec = Ynet[np.ix_(node_idxs_in_sec,node_idxs_in_sec)]
+            
+            #Format the names of the nodes
+            formated_names = []
+            for name in node_names_in_sec:
+                name = name[3:] #Remove the "bus" at the beginning of the name
+                name = name[-3:]
+                #name = name.replace(
+                #    "sec{sec_idx}_".format(sec_idx=sec_idx),
+                #    "")
+                #name =  "b" + str(int(np.mod(sec_idx,3)))
+                #name = name.replace(".","ph") #Replace the dot syntax
+                name = name.replace(".1",".A")
+                name = name.replace(".2",".B")
+                name = name.replace(".3",".C")
+                formated_names.append(name)
+            secondaries['sec' + sec_idx] = {
+                "node_idxs":node_idxs_in_sec,
+                "node_names":formated_names,
+                "Ysec":Ysec
+            }
+        return secondaries    
+
+    def make_secondary_slices(self,n_secondaries = 12):
+        """
+        Make slices of the node indexes of the currently loaded opendss feeder mapping to the secondary networks
+        Params:
+            n_secondaries: Number of secondary groups in the feeder
+        """
+        
+        #Secondaries results dictionary
+        self.secondaries = {}
+
+        #Node names and node names by phase    
+        node_names = dss.Circuit.AllNodeNames()
+        a_node_names,b_node_names,c_node_names = dss.Circuit.AllNodeNamesByPhase(Phase=1),dss.Circuit.AllNodeNamesByPhase(Phase=2),dss.Circuit.AllNodeNamesByPhase(Phase=3)
+
+        #Secondary indeces
+        secondary_names = [str(i) for i in range(1,n_secondaries+1)] #Group index of the secondary names
+        
+        for sec_name in secondary_names:
+            sec_bus_idx = 0 #Counter for the bus number within the secondary
+            node_idxs_in_sec,node_names_in_sec = [],[] 
+            
+            for node_idx,node_name in enumerate(node_names):
+
+                #Collect the phase info
+                if(node_name in a_node_names):
+                    phase = 'a'
+                elif(node_name in b_node_names):
+                    phase = 'b'
+                elif(node_name in c_node_names):
+                    phase = 'c'
+                else:
+                    print("no phase for: {node_name}".format(node_name=node_name))
+                    phase = ""
+                    
+
+
+                if('sec' + sec_name + "_" in node_name): #Hacky way to separate by node name
+                    node_idxs_in_sec.append(node_idx)
+                    node_names_in_sec.append('sec' + sec_name + "_" + str(sec_bus_idx))
+                    #Increment the secondary bus index counter
+                    sec_bus_idx += 1
+                elif("trafo" + sec_name + "lv" in node_name): #Catch low voltage transformers
+                    node_idxs_in_sec.append(node_idx)
+                    node_names_in_sec.append('sec' + sec_name + "_" + "xfmrlv")
+            self.secondaries['sec' + sec_name] = {
+                "node_idxs":node_idxs_in_sec,
+                "node_names":node_names_in_sec
+            }
+        return self.secondaries         
+     
+
+def calc_vph_active_sensitivities(Y,vph):
+    #Number of buses and equations
+    n_bus = len(vph)
+    n_equ = 2*n_bus
+    assert Y.shape == (n_bus,n_bus)
+    
+    #Sensitivity coefficients
+    dvp,dvp_c = np.zeros_like(Y),np.zeros_like(Y)
+    dvp_real,dvp_imag = np.real(dvp),np.imag(dvp)
+    dvp_c_real,dvp_c_imag = np.real(dvp_c),np.imag(dvp_c)
+    
+    #Quantities for building equations
+    conj_coef = Y @ vph
+
+    #LHS of equation
+    lhs = np.vstack((np.eye(3),np.eye(3)))
+
+    #RHS of equation
+    A = np.block([
+        [np.diag(Y@vph), np.diag(np.conj(vph))@Y],
+        [-np.diag(np.conj(vph))@Y, np.diag(np.conj(vph))@Y]
+        ])
+    X = np.linalg.inv(A)@lhs
+    return X
+
+    # for l in range(n_bus):
+    #     for i in range(n_bus): #N_injection systems of N_bus equations 
+    #         lhs = 1 if i == l else 0 #lhs of the equation
+            
+    #         #Coefficients for the standard sensitivity and the conjugate
+    #         dvp_coef = np.dot(Y[i,:],vph)
+    #         dvp_conj_coef = np.dot()
+
+    #         #Store the resulting coefficients
+    #         dvp[i,l] = 
+    #         dvp_c[i,l] = 
+
+
+def calc_vph_reactive_sensitivities(Y,vph):
+    pass
+    
+
+
+class SyntheticSecondaries:
+
+    def __init__(self,n_secondaries,nodes_per_sec,block_mean,block_std):
+        self.n_secondaries = n_secondaries
+        self.nodes_per_sec = nodes_per_sec
+        self.nodes_per_sec = nodes_per_sec 
+        self.block_mean = block_mean
+        self.block_std = block_std
+        self.S = self.make_sensitivities()
+
+    def make_sensitivities(self,nodes_per_sec=None):
+        """
+        This function generates a synthetic secondary sensitivity matrix depending on the number of secondaries and nodes per secondary
+        """
+        if nodes_per_sec is None:
+            nodes_per_sec = self.nodes_per_sec
+        else:
+            self.nodes_per_sec = nodes_per_sec
+        # Separate nodes_per_sec by types
+        if type(self.nodes_per_sec) is int or type(self.nodes_per_sec) is float:
+            return self.generate_block_data(self.block_mean,self.block_std) 
+        elif type(self.nodes_per_sec) is list:
+            if len(self.nodes_per_sec) == self.n_secondaries:
+                return self.generate_block_data(self.block_mean,self.block_std) 
+            else:
+                raise ValueError("nodes_per_sec must be a list of length n_secondaries")        
+        else:
+            raise ValueError("nodes_per_sec must be a list or a number")
+        
+    def generate_block_data(self,block_mean,block_std):
+        """
+        Generates random normal sensitivities for the entries of each secondary network subblocks
+        """
+        blocks = {}
+        for sec_idx in range(self.n_secondaries):
+            blocks['sec' + str(sec_idx)] = self.generate_block(block_mean,block_std)
+        return blocks
+    
+    def generate_block(self,block_mean,block_std):
+        """
+        Generates random normal sensitivities for the entries of a secondary network subblock
+        """
+        return np.random.normal(block_mean,block_std,(self.nodes_per_sec,self.nodes_per_sec))
+    
+    def get_localization(self,localization_type='nuclear'):
+        """
+        Gets the localization coefficient for the synthetic matrix
+        """
+        if localization_type in ['nuclear','nuc','nuclear_norm','nuc_norm','nuclear_norm']:
+            l = np.norm(self.S,ord='nuc')            
+        elif localization_type in ['opnorm','operator_norm','spectral','spectral_norm','2_norm','2',2]:
+            l = np.norm(self.S,ord=2)
+        else:
+            raise ValueError("localization_type must be nuclear or spectral")
+        return l
+    
+    def get_condition_number(self):
+        """
+        Gets the condition number of the synthetic matrix
+        """
+        return np.linalg.cond(self.S)
+    
+    def get_eigenvalues(self):
+        """
+        Gets the eigenvalues of the synthetic matrix
+        """
+        return np.linalg.eig(self.S)    
+    
+    def get_singular_values(self):
+        """
+        Gets the singular values of the synthetic matrix
+        """
+        return np.linalg.svd(self.S)    
+    
+    def get_rank(self):
+        """
+        Gets the rank of the synthetic matrix
+        """
+        return np.linalg.matrix_rank(self.S)    
+    
+    def get_sparsity(self): 
+        """
+        Gets the sparsity of the synthetic matrix
+        """
+        return np.count_nonzero(self.S)/self.S.size
+    

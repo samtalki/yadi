@@ -1,4 +1,31 @@
-env/*
-.vscode/*
-yadi/__pycache__/
-yadi/dss/__pycache__/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# uv / pytest / mypy / ruff caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Examples generate artifacts when run
+examples/qsts_output.npz
+examples/svp.png
+
+# OpenDSS scratch files
+*.dbl

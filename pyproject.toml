@@ -1,25 +1,68 @@
-[tool.poetry]
+[project]
 name = "yadi"
-version = "0.1.0"
-description = "Yet another DSS interface"
-authors = ["samtalki <saimouer@gmail.com>"]
-license = "MIT"
+version = "0.2.0"
+description = "Research workflows for distribution network analysis on top of OpenDSSDirect.py."
 readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Samuel Talkington", email = "talkington@pm.me" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "matplotlib>=3.9",
+    "opendssdirect-py[extras]>=0.9",
+    "h5py>=3.11",
+    "cvxpy>=1.5",
+    "tqdm>=4.66",
+    "numba>=0.60",
+]
 
-[tool.poetry.dependencies]
-python = "^3.9"
-numpy = "^1.24.3"
-matplotlib = "^3.7.1"
-pandas = "^2.0.1"
-numba = "^0.57.0"
-"OpenDSSDirect.py" = {extras = ["extras"], version = "^0.8.2"}
-h5py = "^3.8.0"
-cvxpy = "^1.3.1"
-seaborn = "^0.12.2"
-ipykernel = "^6.23.1"
-tqdm = "^4.65.0"
-
+[project.optional-dependencies]
+research = [
+    "jax>=0.4.30",
+    "optax>=0.2",
+]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "nbstripout>=0.7",
+    "pre-commit>=3.8",
+    "ipykernel>=6.29",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["yadi"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["notebooks", "yadi/experimental"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "W"]
+# N801: existing public class names use DSS_* (snake_case). Renaming would break callers.
+# N802/N803/N806: power-systems variable names (V, P, Q, Svp, etc.) follow domain conventions.
+# E501: line length is enforced via formatter, not the linter.
+ignore = ["E501", "N801", "N802", "N803", "N806"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+exclude = ["yadi/experimental", "tests", "examples", "notebooks"]
+
+[[tool.mypy.overrides]]
+module = "yadi.experimental.*"
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --strict-markers"
