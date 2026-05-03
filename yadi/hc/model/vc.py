@@ -1,6 +1,4 @@
-"""Model-based voltage-constrained hosting capacity analysis."""
-
-import warnings
+"""Voltage constrained hosting capacity analysis (model based)."""
 
 import numpy as np
 
@@ -8,7 +6,7 @@ import yadi.dss.model as model
 
 
 class DSS_VC_HCA(model.DSS_Data):
-    """Iterative model-based hosting-capacity computation under a voltage upper bound."""
+    """Hosting capacity by iterative kW perturbation under a voltage cap."""
 
     def __init__(
         self,
@@ -36,15 +34,14 @@ class DSS_VC_HCA(model.DSS_Data):
             self.pfs = pfs
 
         self.compile_dss()
-        self.dss.Text.Command("solve")
+        self.solve()
 
         vpu_base = np.copy(self.dss.Circuit.AllBusMagPu())
         sub_overvoltage_idx = [i for i in range(len(vpu_base)) if vpu_base[i] < self.v_max]
 
         hc = np.zeros(self.n_nodes)
         for node_idx, node in enumerate(self.nodes):
-            if vpu_base[node_idx] > 1.05:
-                hc[node_idx] = 0
+            if vpu_base[node_idx] > self.v_max:
                 continue
             for kw_inj in [
                 -1 * float(i)
@@ -64,28 +61,17 @@ class DSS_VC_HCA(model.DSS_Data):
         self.compile_dss()
         self.dss.Text.Command("Set Controlmode = STATIC")
         self.__set_perturbed_injection(bus_name, phases, kw_inj, kvar_inj)
-        self.dss.Text.Command("solve")
+        self.solve()
         return self.get_node_voltages()
 
     def __set_perturbed_injection(self, bus_name, phases, kw_inj, kvar_inj):
         """Place a perturbing injection on a bus of interest."""
-        bus_name = str(bus_name)
-        phases = str(phases)
-        kw_inj = str(kw_inj)
-        kvar_inj = str(kvar_inj)
-        injection_name = bus_name + "_static_inj"
+        injection_name = f"load_{str(bus_name).replace('.', '_')}_static_inj"
+        self.dss.Circuit.SetActiveBus(str(bus_name).split(".", 1)[0])
+        kv = self.dss.Bus.kVBase()
         err = self.dss.Text.Command(
-            "New Load.{injection_name} Bus1={bus_name} Phases={phases} "
-            "kW ={kw_inj} kvar={kvar_inj}".format(
-                injection_name="load" + str(injection_name),
-                bus_name=bus_name,
-                phases=phases,
-                kw_inj=kw_inj,
-                kvar_inj=kvar_inj,
-            )
+            f"New Load.{injection_name} Bus1={bus_name} Phases={phases} "
+            f"kV={kv} kW={kw_inj} kvar={kvar_inj}"
         )
-        if self.verbose:
-            print(err)
-        elif err != "":
-            warnings.warn("Perturbed injection failed, OpenDSS returned:")
-            print(err)
+        if err:
+            raise RuntimeError(f"Perturbed injection on {bus_name!r} failed: {err}")

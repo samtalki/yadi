@@ -8,12 +8,8 @@ import yadi.dss.monitor as monitor
 
 
 class DSS_LoadShape(monitor.DSS_Monitor):
-    def __init__(self, redirects, precompile, verbose=False):
-        """ "
-        Class for handling LoadShapes in OpenDSS.
-
-        """
-        super().__init__(redirects, redirects, precompile)
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
     def set_loadshape(self, loadshape_path, loadshape_name="loadshape1"):
         """

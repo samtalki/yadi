@@ -49,10 +49,18 @@ class DSS_Data:
         """Compile every redirect file registered on this instance and solve."""
         for redirect in self.redirects:
             self.redirect(redirect)
-            self.run_command("solve")
+            self.solve()
         self.num_compilations += 1
         if self.verbose:
             print(f"DSS Compiled Circuit: {self.dss.Circuit.Name()}")
+
+    def solve(self) -> None:
+        """Run `solve` and raise if OpenDSS reports non-convergence."""
+        self.run_command("solve")
+        if not self.dss.Solution.Converged():
+            raise RuntimeError(
+                f"OpenDSS solve did not converge for circuit {self.dss.Circuit.Name()!r}."
+            )
 
     @staticmethod
     def run_command(cmd: str) -> None:
@@ -104,12 +112,11 @@ class DSS_Data:
                 node = bus + f".{node}"
                 # Check if the node is in the y node order
                 if node not in y_node_order:
-                    # Make the node name consistent with the y node order.
-                    # For now, if the node name is not in the y node order, assume that it should be captilized and fix this.
-                    node = node.upper()  # make the node name upper case
-                    # Check if the node is in the y node order
+                    node = node.upper()
                     if node not in y_node_order:
-                        # Node is unrecoverable from the y_node_order; skip it.
+                        warnings.warn(
+                            f"node {node!r} on bus {bus!r} is not in YNodeOrder; skipping."
+                        )
                         continue
                 # Save the base voltage for this node as the bus base voltage.
                 node_base_voltages[node] = bus_base_voltage
@@ -167,12 +174,9 @@ class DSS_Data:
         return voltages_dict
 
     def get_bus_voltages_pu(self):
-        """Get the per-unit voltage magnitudes for all buses, plus the OpenDSS solve status."""
-        err = self.dss.Text.Command("solve")
-        if not err == "":
-            print(err)
-        voltages = self.dss.Circuit.AllBusMagPu()
-        return voltages, err
+        """Solve and return per-unit voltage magnitudes for all buses."""
+        self.solve()
+        return self.dss.Circuit.AllBusMagPu()
 
     def get_node_currents(self):
         """
@@ -457,7 +461,7 @@ class DSS_Data:
                 "NodeOrder": self.dss.CktElement.NodeOrder(),
             }
             data_xfmrs[name_xfmr] = xfmr_data  # Save the data for this xfmr
-            xfmr = dss.Transformers.Next()  # increment xfmr
+            xfmr = self.dss.Transformers.Next()
             xfmr_idx += 1  # increment index
         return data_xfmrs
 

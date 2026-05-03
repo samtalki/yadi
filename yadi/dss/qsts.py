@@ -42,6 +42,12 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         self.maxiterations = maxiterations
         self.solution_number = solution_number
 
+        if data_structure != "matrix":
+            raise ValueError(
+                f"data_structure={data_structure!r} is not supported; only 'matrix' is implemented."
+            )
+        if flow_direction not in ("from", "to"):
+            raise ValueError(f"flow_direction={flow_direction!r} must be 'from' or 'to'.")
         self.data_structure = data_structure
         self.flow_direction = flow_direction
         self.verbose = verbose
@@ -140,30 +146,20 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         Run a "Quasi-Static Time-Series" and get multivariate timeseries dataset of
         voltage phasors, complex powers, and currents, for each node
         """
-        # Get the names of all lines and transformers,
         names_lines = self.dss.Lines.AllNames()
         names_xfmrs = self.dss.Transformers.AllNames()
 
-        # Get the data for all lines and transformers (Num conductors, phases, etc.)
         data_lines = self.get_line_data()
         data_xfmrs = self.get_xfmr_data()
 
-        # Get the total number of condutors for all lines and transformers
-        n_cond_lines, n_cond_xfmrs = [], []
-        for name in names_lines:
-            try:
-                n_cond_lines.append(data_lines[name]["NumConductors"])
-            except KeyError:
-                warnings.warn(
-                    f"Line {name} has no NumConductors attribute, not recording its num_conductors"
-                )
-        for name in names_xfmrs:
-            try:
-                n_cond_xfmrs.append(data_xfmrs[name]["NumConductors"])
-            except KeyError:
-                warnings.warn(
-                    f"Xfmr {name} has no NumConductors attribute, not recording its num_conductors"
-                )
+        # n_cond_lines must stay aligned with the OpenDSS line iterator below.
+        try:
+            n_cond_lines = [data_lines[name]["NumConductors"] for name in names_lines]
+            n_cond_xfmrs = [data_xfmrs[name]["NumConductors"] for name in names_xfmrs]
+        except KeyError as e:
+            raise RuntimeError(
+                f"Missing NumConductors for element {e.args[0]!r}; cannot run QSTS."
+            ) from e
 
         tot_cond_lines = int(np.sum(n_cond_lines, dtype=int))
         tot_cond_xfmrs = int(np.sum(n_cond_xfmrs, dtype=int))
@@ -188,11 +184,8 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
             (self.simulation_steps, tot_cond_xfmrs), dtype=np.cdouble
         )  # xfmr current multivariate timeseries array MxN
 
-        # Run Duty mode qsts
         for it in tqdm(range(self.simulation_steps), desc="QSTS running..."):
-            err = self.dss.Text.Command("solve")
-            if err != "":
-                warnings.warn("OpenDSS Raised a QSTS error: ", err)
+            self.solve()
             voltages_dict_t = self.get_node_voltages()
             vmags_pu_dict_t = self.get_node_voltages_mag_pu()
             currents_dict_t = self.get_node_currents()
@@ -214,52 +207,18 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
                     node
                 ]  # fill in the MVTS array of nodal complex power injections
 
-            # Fill in the line flow arrays
+            term_row = 0 if self.flow_direction == "from" else 1
             line_idx, line = 0, self.dss.Lines.First()
             while line:
-                name = self.dss.Lines.Name()  ##NOTE deprecateD: #names_lines[line_idx]
+                name = self.dss.Lines.Name()
                 n_cond = n_cond_lines[line_idx]
-                if self.data_structure == "dict":
-                    warnings.warn(
-                        "Line currents not yet supported for dict data structure, using matrix instead"
-                    )
-                    self.data_structure = "matrix"
-                if self.data_structure == "matrix":
-                    if self.flow_direction == "from":
-                        self.line_currents_mvts[it, line_idx : line_idx + n_cond] = (
-                            line_currents_dict_t[name][0, :]
-                        )
-                    elif self.flow_direction == "to":
-                        self.line_currents_mvts[it, line_idx : line_idx + n_cond] = (
-                            line_currents_dict_t[name][1, :]
-                        )
-                    else:
-                        raise ValueError("Invalid flow direction. Options are 'from' or 'to'")
-                else:
-                    raise ValueError("Invalid data structure. Options are 'matrix' or 'dict'")
+                self.line_currents_mvts[it, line_idx : line_idx + n_cond] = line_currents_dict_t[
+                    name
+                ][term_row, :]
                 line_idx += 1
                 line = self.dss.Lines.Next()
 
-            ### NOTE: Transformer QSTS is broken right now, need to fix
-            # # Fill in the xfmr flow arrays
-            # xfmr_idx,xfmr = 0,self.dss.Transformers.First()
-            # while xfmr:
-            #     name = self.dss.Transformers.Name() #NOTE: Deprecated method #names_xfmrs[xfmr_idx]
-            #     n_cond = n_cond_xfmrs[xfmr_idx]
-            #     if self.data_structure == 'dict':
-            #         warnings.warn("Xfmr currents not yet supported for dict data structure, using matrix instead")
-            #         self.data_structure = 'matrix'
-            #     if self.data_structure == 'matrix':
-            #         if self.flow_direction == 'from':
-            #             self.xfmr_currents_mvts[it,xfmr_idx:xfmr_idx+n_cond] = xmfr_currents_dict_t[name][0,:]
-            #         elif self.flow_direction == 'to':
-            #             self.xfmr_currents_mvts[it,xfmr_idx:xfmr_idx+n_cond] = xmfr_currents_dict_t[name][1,:]
-            #         else:
-            #             raise ValueError("Invalid flow direction. Options are 'from' or 'to'")
-            #     else:
-            #         raise ValueError("Invalid data structure. Options are 'matrix' or 'dict'")
-            #     xfmr_idx += 1
-            #     xfmr = self.dss.Transformers.Next()
+            # xfmr flow recording is not implemented; xfmr_currents_mvts stays zero-init.
 
         self.__qsts_complete = True
 

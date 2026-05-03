@@ -1,6 +1,6 @@
 # Contributing to yadi
 
-Thanks for considering a contribution. yadi is a research codebase, so the bar for new code is "clear, typed, tested" rather than "production-grade across all axes."
+Thanks for considering a contribution. yadi is a research codebase: the bar for new code is clear, typed, and tested.
 
 ## Setup
 
@@ -25,7 +25,7 @@ CI runs all of these on every PR against `main`.
 
 - **Public API in `yadi.dss`, `yadi.sens`, `yadi.hc`, `yadi.data`.** Type-hint everything in those modules.
 - **Experimental code goes in `yadi.experimental`** with a banner comment at the top of each module. mypy is relaxed on that subtree.
-- **Power-systems variable names** like `V`, `P`, `Q`, `Svp` are intentional and excluded from naming-convention lints.
+- **Power systems variable names** like `V`, `P`, `Q`, `Svp` are intentional and excluded from naming-convention lints.
 - **No dead code.** Don't leave `pass`-only stubs; either implement or delete.
 - **The DSS binding is imported from `yadi/dss/_binding.py` only.** Don't `import opendssdirect` directly — that file documents why.
 

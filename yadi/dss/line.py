@@ -4,12 +4,8 @@ import yadi.dss.bus as bus
 
 
 class DSS_Line(bus.DSS_Bus):
-    def __init__(self, redirects, precompile, verbose=False):
-        """ "
-        Class for handling lines in OpenDSS.
-        """
-
-        super().__init__(redirects, redirects, precompile)
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
     def create_lines(self):
 

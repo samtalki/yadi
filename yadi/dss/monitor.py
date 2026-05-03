@@ -4,13 +4,8 @@ import yadi.dss.model as model
 
 
 class DSS_Monitor(model.DSS_Data):
-    def __init__(self, redirects, precompile, verbose=False):
-        """ "
-        Class for handling monitors in OpenDSS.
-
-        """
-
-        super().__init__(redirects, redirects, precompile)
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, verbose=verbose, precompile=precompile)
 
     def export_monitor(self, monitor_name, verbose=False):
         """Exports a single monitor to a dataframe"""

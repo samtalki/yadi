@@ -2,13 +2,8 @@ import yadi.dss.load_shape as load_shape
 
 
 class DSS_Bus(load_shape.DSS_LoadShape):
-    def __init__(self, redirects, precompile, verbose=False):
-        """ "
-        Class for handling buses in OpenDSS.
-
-        """
-
-        super().__init__(redirects, redirects, precompile)
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
     def create_buses(self):
 

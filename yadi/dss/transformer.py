@@ -6,12 +6,8 @@ import yadi.dss.line as line
 
 
 class DSS_Transformer(line.DSS_Line):
-    def __init__(self, redirects, precompile, verbose=False):
-        """ "
-        Class for handling Transformers in OpenDSS.
-
-        """
-        super().__init__(redirects, redirects, precompile)
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
     def get_regulators(self):
 

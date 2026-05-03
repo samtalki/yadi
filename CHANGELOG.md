@@ -2,7 +2,7 @@
 
 ## 0.2.0 — 2026-05
 
-Repository modernization for first-pass review.
+Repository modernization.
 
 ### Added
 - PEP 621 `pyproject.toml` with `uv` lockfile (`uv.lock`).
@@ -13,7 +13,7 @@ Repository modernization for first-pass review.
 - Single-source DSS binding indirection at `yadi/dss/_binding.py`.
 - `examples/` with four runnable scripts.
 - `__init__.py` files exposing the public API: `DSS_Data`, `DSS_Sensitivities`, `DSS_Timeseries`, `DSS_VC_HCA`, `AMIData`, `CLA`.
-- `yadi/experimental/` for incomplete research code (JAX sensitivity, group HC, secondary-network solver).
+- `yadi/experimental/` for incomplete research code (JAX sensitivity, group HC, secondary network solver).
 
 ### Fixed
 - `DSS_Sensitivities.get_svp/svq/sthp/sthq` and `DSS_VC_HCA.get_iterative_hc` no longer raise `TypeError` from passing redirects to the no-arg `compile_dss`.

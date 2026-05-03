@@ -4,13 +4,8 @@ import yadi.dss.shunt as shunt
 
 
 class DSS_Load(shunt.DSS_Shunt):
-    def __init__(self, redirects, precompile, verbose=False):
-        """ "
-        Class for handling loads in OpenDSS.
-
-        """
-
-        super().__init__(redirects, redirects, precompile)
+    def __init__(self, redirects, precompile: bool = True, verbose: bool = True) -> None:
+        super().__init__(redirects, precompile=precompile, verbose=verbose)
 
     def create_loads(self):
 

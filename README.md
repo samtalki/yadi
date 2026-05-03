@@ -2,7 +2,7 @@
 
 # yadi
 
-Research workflows for distribution network analysis on top of [OpenDSSDirect.py](https://github.com/dss-extensions/OpenDSSDirect.py). yadi adds sensitivity analysis, hosting capacity, and AMI dataset generation on top of a cross-platform OpenDSS binding.
+Research workflows for distribution network analysis on top of [OpenDSSDirect.py](https://github.com/dss-extensions/OpenDSSDirect.py). yadi adds sensitivity analysis, hosting capacity, and AMI dataset generation on top of a cross platform OpenDSS binding.
 
 ## Install
 
@@ -23,29 +23,29 @@ print(d.dss.Circuit.Name())
 print(d.dss.Circuit.AllBusMagPu())
 ```
 
-For more, see [`examples/`](examples/) (quickstart, QSTS dataset, perturb-and-observe sensitivities, local hosting capacity).
+For more, see [`examples/`](examples/) (quickstart, QSTS dataset, perturb and observe sensitivities, local hosting capacity).
 
 ## What yadi adds on top of OpenDSSDirect.py
 
-- `yadi.dss.DSS_Sensitivities` — perturb-and-observe sensitivity matrices `S_vp`, `S_vq`, `S_θp`, `S_θq`.
-- `yadi.dss.DSS_Timeseries` — quasi-static time series (QSTS) dataset orchestration: voltages, complex powers, currents, line/transformer flows.
-- `yadi.hc.DSS_VC_HCA` — model-based voltage-constrained hosting capacity.
-- `yadi.hc.measurement.local` — AMI-based hosting capacity pipeline using regression sensitivities.
+- `yadi.dss.DSS_Sensitivities` — perturb and observe sensitivity matrices `S_vp`, `S_vq`, `S_θp`, `S_θq`.
+- `yadi.dss.DSS_Timeseries` — quasi-static time series (QSTS) dataset orchestration: voltages, complex powers, currents, line and transformer flows.
+- `yadi.hc.DSS_VC_HCA` — voltage constrained hosting capacity (model based).
+- `yadi.hc.measurement.local` — AMI based hosting capacity using regression sensitivities.
 - `yadi.sens.CLA` — conservative linear approximation via constrained l1 regression.
 - `yadi.data.AMIData` — HDF5 ingestion for finite-difference workflows on real meter data.
 
 ## Where yadi sits in the ecosystem
 
-yadi is a research-workflow layer; both `OpenDSSDirect.py` and EPRI's `py_dss_interface` are DSS binding layers with different distributions and API styles. yadi currently uses `OpenDSSDirect.py` for cross-platform reach (Apple Silicon support exists today). Migration to `py_dss_interface` is the planned next step once it ships macOS binaries — the binding is isolated to [`yadi/dss/_binding.py`](yadi/dss/_binding.py) plus the wrapper layer in `yadi/dss/*.py` to keep that change contained and auditable.
+yadi is a research workflow layer; both `OpenDSSDirect.py` and EPRI's `py_dss_interface` are DSS binding layers with different distributions and API styles. yadi currently uses `OpenDSSDirect.py` for cross platform reach (Apple Silicon support exists today). Migration to `py_dss_interface` is the planned next step once it ships macOS binaries — the binding is isolated to [`yadi/dss/_binding.py`](yadi/dss/_binding.py) plus the wrapper layer in `yadi/dss/*.py` to keep that change contained.
 
 ## Test cases
 
-Sample feeders live in [`test_cases/`](test_cases/) — small balanced/unbalanced 3-bus networks, the IEEE 13-bus benchmark, and several transformer test cases.
+Sample feeders live in [`test_cases/`](test_cases/) — small balanced and unbalanced 3-bus networks, the IEEE 13-bus benchmark, and several transformer test cases.
 
 ## Status
 
 - **Stable:** `yadi.dss`, `yadi.sens`, `yadi.hc`, `yadi.data`. Tested in CI on macOS 14 and Ubuntu, Python 3.11/3.12.
-- **Experimental:** `yadi.experimental` — incomplete research code (JAX sensitivity model, group HC, secondary-network solver). API may change.
+- **Experimental:** `yadi.experimental` — incomplete research code (JAX sensitivity model, group HC, secondary network solver). API may change.
 
 ## Citation
 

@@ -1,14 +1,4 @@
-#!/usr/bin/env python
-"""
-Methods for constructing and manipulating linear approximations of the power flow equations via voltage magnitude sensitivity models.
-"""
-
-__author__ = "Samuel Talkington"
-__contact__ = "talkington@pm.me"
-__copyright__ = "Copyright (c) 2021-Present Samuel Talkington, All Rights Reserved."
-__license__ = "MIT"
-__date__ = "2022/03/28"
-__version__ = "0.0.1"
+"""Linear voltage sensitivity models from data: regression with optional excitation filtering."""
 
 import numpy as np
 from numba import jit, njit
@@ -71,24 +61,18 @@ def excitation_filter(
         absolute_value (bool): Whether to find the quantile w.r.t. to absolute value of the filter_var or not.
         return_idx_filtered (bool): Whether to return the selected indeces returned from the filter.
     """
-    if X.ndim > 1:
-        X_test = X[:, 0]
+    if filter_var not in ("p", "x", "v"):
+        raise ValueError(f"filter_var={filter_var!r} must be one of 'p', 'x', 'v'.")
+
+    X_test = X[:, 0] if X.ndim > 1 else X
+    if filter_var in ("p", "x"):
+        target = np.abs(X_test) if absolute_value else X_test
+        threshold = np.quantile(a=target, q=quantile)
+        idx_filtered = np.arange(X.shape[0])[target > threshold]
     else:
-        X_test = X
-    if absolute_value:
-        if filter_var == "p" or filter_var == "x":
-            X_quantile = np.quantile(a=np.abs(X_test), q=quantile)
-            idx_filtered = np.arange(X.shape[0])[np.abs(X_test) > X_quantile]
-        elif filter_var == "v":
-            v_q = np.quantile(a=np.abs(v), q=quantile)
-            idx_filtered = np.arange(v.shape[0])[np.abs(v) > v_q]
-    else:
-        if filter_var == "p" or filter_var == "x":
-            X_quantile = np.quantile(a=X_test, q=quantile)
-            idx_filtered = np.arange(X.shape[0])[X_test > X_quantile]
-        elif filter_var == "v":
-            v_q = np.quantile(a=v, q=quantile)
-            idx_filtered = np.arange(v.shape[0])[v > v_q]
+        target = np.abs(v) if absolute_value else v
+        threshold = np.quantile(a=target, q=quantile)
+        idx_filtered = np.arange(v.shape[0])[target > threshold]
     X_filtered = X[idx_filtered]
     v_filtered = v[idx_filtered]
     if return_idx_filtered:

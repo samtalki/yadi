@@ -1,6 +1,4 @@
-"""Perturb-and-observe sensitivity matrices for an OpenDSS network."""
-
-import warnings
+"""Perturb and observe sensitivity matrices for an OpenDSS network."""
 
 import numpy as np
 
@@ -10,7 +8,7 @@ SensitivityResult = dict[str, object]
 
 
 class DSS_Sensitivities(model.DSS_Data):
-    """Compute perturb-and-observe sensitivity matrices on top of `DSS_Data`."""
+    """Compute perturb and observe sensitivity matrices."""
 
     def __init__(
         self,
@@ -50,13 +48,9 @@ class DSS_Sensitivities(model.DSS_Data):
         return self.sqth
 
     def __calc_sens_mat(self, indp_var="vmag", dep_var="p"):
-        """Compute a perturb-and-observe sensitivity matrix.
-
-        indp_var: independent variable -- "vmag" or "theta".
-        dep_var: dependent variable -- "p" or "q".
-        """
+        """Compute a perturb and observe sensitivity matrix."""
         self.compile_dss()
-        self.dss.Text.Command("solve")
+        self.solve()
 
         nodes = self.dss.Circuit.YNodeOrder()
 
@@ -102,7 +96,7 @@ class DSS_Sensitivities(model.DSS_Data):
         self.compile_dss()
         self.dss.Text.Command("Set Controlmode = STATIC")
         self.__set_perturbed_injection(bus_name, phases, kw_inj, kvar_inj)
-        self.dss.Text.Command("solve")
+        self.solve()
         if self.per_unit:
             return self.get_node_voltages_mag_pu()
         else:
@@ -110,23 +104,12 @@ class DSS_Sensitivities(model.DSS_Data):
 
     def __set_perturbed_injection(self, bus_name, phases, kw_inj, kvar_inj):
         """Place a perturbing injection on a bus of interest."""
-        bus_name = str(bus_name)
-        phases = str(phases)
-        kw_inj = str(kw_inj)
-        kvar_inj = str(kvar_inj)
-        injection_name = bus_name + "_static_inj"
+        injection_name = f"load_{str(bus_name).replace('.', '_')}_static_inj"
+        self.dss.Circuit.SetActiveBus(str(bus_name).split(".", 1)[0])
+        kv = self.dss.Bus.kVBase()
         err = self.dss.Text.Command(
-            "New Load.{injection_name} Bus1={bus_name} Phases={phases} "
-            "kW ={kw_inj} kvar={kvar_inj}".format(
-                injection_name="load" + str(injection_name),
-                bus_name=bus_name,
-                phases=phases,
-                kw_inj=kw_inj,
-                kvar_inj=kvar_inj,
-            )
+            f"New Load.{injection_name} Bus1={bus_name} Phases={phases} "
+            f"kV={kv} kW={kw_inj} kvar={kvar_inj}"
         )
-        if self.verbose:
-            print(err)
-        elif err != "":
-            warnings.warn("Perturbed injection failed, OpenDSS returned:")
-            print(err)
+        if err:
+            raise RuntimeError(f"Perturbed injection on {bus_name!r} failed: {err}")
