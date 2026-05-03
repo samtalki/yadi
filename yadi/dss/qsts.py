@@ -29,8 +29,6 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         per_unit: bool = True,
         precompile: bool = True,
     ) -> None:
-        """Construct a QSTS simulator. `data_structure` is "matrix" or "dict";
-        `flow_direction` is "from" or "to". `per_unit` is currently unused."""
         super().__init__(redirects, precompile=precompile)
 
         self.time_step = time_step
@@ -51,72 +49,50 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         self.data_structure = data_structure
         self.flow_direction = flow_direction
         self.verbose = verbose
+        # per_unit is accepted for API parity with DSS_Sensitivities; not yet used here.
         self.per_unit = per_unit
 
-        # (m x n) multivariate timeseries arrays, populated by run().
         self.voltages_mvts: np.ndarray | None = None
         self.vmags_pu_mvts: np.ndarray | None = None
         self.currents_mvts: np.ndarray | None = None
         self.complex_powers_mvts: np.ndarray | None = None
         self.line_currents_mvts: np.ndarray | None = None
-        self.xfmr_currents_mvts: np.ndarray | None = None
         self.nodal_mvts_dfs: dict[str, pd.DataFrame] | None = None
 
         self.__qsts_initialized = False
         self.__qsts_complete = False
 
     def __check_qsts_initialization(self, native=False):
-        """Check if QSTS has been properly initialized"""
-        # Check to see if QSTS is initialized
+        """Recompile and re-initialize QSTS if needed; warn on reset to flag lost state."""
         if not self.__qsts_initialized:
-            warnings.warn("QSTS has not been initialized. Initiailizing before run.")
+            warnings.warn("QSTS has not been initialized; initializing before run.")
             self.compile_dss()
             self.initialize_qsts(native)
-
         elif self.__qsts_complete:
-            # warnings.warn("QSTS has already been run for the input files. Recompiling before run...")
+            warnings.warn("QSTS already ran for these files; recompiling will reset DSS state.")
             self.compile_dss()
             self.initialize_qsts(native)
 
     def initialize_qsts(self, native, verbose=False):
-        """
-        Initialize a chosen-mode Quasi-Static Time Series simulation.
-
-        Params:
-            monitor_loads (boolean): Whether or not to set monitors on all loads.
-
-        """
-        errs = []
-
+        """Initialize a QSTS simulation; in native mode, place monitors on loads/lines/xfmrs."""
         if native:
             number = self.simulation_steps
-
             self.set_monitor_all_loads(verbose=verbose)
-
             self.set_monitor_all_lines(verbose=verbose)
-
             self.set_monitor_all_trafos(verbose=verbose)
         else:
             number = self.solution_number
 
-        errs.append(self.dss.Text.Command(f"Set controlmode={self.simulation_controlmode}"))
-        errs.append(
-            self.dss.Text.Command(
-                f"Set mode={self.simulation_mode} "
-                f"number={number} "
-                f"stepsize={self.time_step} "
-                f"maxcontroliter={self.maxcontroliter} "
-                f"maxiterations={self.maxiterations} "
-                f"miniterations={self.miniterations} "
-            )
+        self.dss.Text.Command(f"Set controlmode={self.simulation_controlmode}")
+        self.dss.Text.Command(
+            f"Set mode={self.simulation_mode} "
+            f"number={number} "
+            f"stepsize={self.time_step} "
+            f"maxcontroliter={self.maxcontroliter} "
+            f"maxiterations={self.maxiterations} "
+            f"miniterations={self.miniterations} "
         )
-
-        # print('QSTS Initialized, Returned: ', [err for err in errs])
         self.__qsts_initialized = True
-
-    #  #################################################
-    #  ######### run net node injection QSTS #########
-    #  #################################################
 
     def run(self) -> None:
         """Run the QSTS simulation and populate the per-node timeseries dataframes."""
@@ -142,47 +118,27 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
         self.nodal_mvts_dfs = nodal_mvts_dfs
 
     def __run_qsts_duty(self, nodes, n_nodes):
-        """
-        Run a "Quasi-Static Time-Series" and get multivariate timeseries dataset of
-        voltage phasors, complex powers, and currents, for each node
-        """
+        """Run QSTS and populate per-node voltage, current, and complex-power MVTS arrays."""
         names_lines = self.dss.Lines.AllNames()
-        names_xfmrs = self.dss.Transformers.AllNames()
-
         data_lines = self.get_line_data()
-        data_xfmrs = self.get_xfmr_data()
 
         # n_cond_lines must stay aligned with the OpenDSS line iterator below.
         try:
             n_cond_lines = [data_lines[name]["NumConductors"] for name in names_lines]
-            n_cond_xfmrs = [data_xfmrs[name]["NumConductors"] for name in names_xfmrs]
         except KeyError as e:
             raise RuntimeError(
                 f"Missing NumConductors for element {e.args[0]!r}; cannot run QSTS."
             ) from e
 
         tot_cond_lines = int(np.sum(n_cond_lines, dtype=int))
-        tot_cond_xfmrs = int(np.sum(n_cond_xfmrs, dtype=int))
 
-        # Set internal fields for the data structure
-        self.voltages_mvts = np.empty(
-            (self.simulation_steps, n_nodes), dtype=np.cdouble
-        )  # voltage multivariate timeseries array MxN
-        self.vmags_pu_mvts = np.empty(
-            (self.simulation_steps, n_nodes), dtype=np.double
-        )  # voltage magnitude multivariate timeseries array MxN
-        self.complex_powers_mvts = np.empty(
-            (self.simulation_steps, n_nodes), dtype=np.cdouble
-        )  # voltage multivariate timeseries array MxN
-        self.currents_mvts = np.empty(
-            (self.simulation_steps, n_nodes), dtype=np.cdouble
-        )  # current multivariate timeseries array MxN
+        self.voltages_mvts = np.empty((self.simulation_steps, n_nodes), dtype=np.cdouble)
+        self.vmags_pu_mvts = np.empty((self.simulation_steps, n_nodes), dtype=np.double)
+        self.complex_powers_mvts = np.empty((self.simulation_steps, n_nodes), dtype=np.cdouble)
+        self.currents_mvts = np.empty((self.simulation_steps, n_nodes), dtype=np.cdouble)
         self.line_currents_mvts = np.empty(
             (self.simulation_steps, tot_cond_lines), dtype=np.cdouble
-        )  # line current multivariate timeseries array MxN
-        self.xfmr_currents_mvts = np.empty(
-            (self.simulation_steps, tot_cond_xfmrs), dtype=np.cdouble
-        )  # xfmr current multivariate timeseries array MxN
+        )
 
         for it in tqdm(range(self.simulation_steps), desc="QSTS running..."):
             self.solve()
@@ -192,176 +148,90 @@ class DSS_Timeseries(voltage_source.DSS_VoltageSource):
             complex_powers_dict_t = self.get_node_complex_powers()
             line_currents_dict_t = self.get_line_currents(structure=self.data_structure)
 
-            # Fill in the nodal bus injection arrays
             for node_idx, node in enumerate(nodes):
-                self.vmags_pu_mvts[it, node_idx] = vmags_pu_dict_t[
-                    node
-                ]  # fill in the MVTS array of nodal voltage magnitudes in per unit
-                self.voltages_mvts[it, node_idx] = voltages_dict_t[
-                    node
-                ]  # fill in the MVTS array of nodal voltage phasors
-                self.currents_mvts[it, node_idx] = currents_dict_t[
-                    node
-                ]  # fill in the MVTS array of nodal currents
-                self.complex_powers_mvts[it, node_idx] = complex_powers_dict_t[
-                    node
-                ]  # fill in the MVTS array of nodal complex power injections
+                self.vmags_pu_mvts[it, node_idx] = vmags_pu_dict_t[node]
+                self.voltages_mvts[it, node_idx] = voltages_dict_t[node]
+                self.currents_mvts[it, node_idx] = currents_dict_t[node]
+                self.complex_powers_mvts[it, node_idx] = complex_powers_dict_t[node]
 
             term_row = 0 if self.flow_direction == "from" else 1
-            line_idx, line = 0, self.dss.Lines.First()
+            line_idx, cond_idx, line = 0, 0, self.dss.Lines.First()
             while line:
                 name = self.dss.Lines.Name()
                 n_cond = n_cond_lines[line_idx]
-                self.line_currents_mvts[it, line_idx : line_idx + n_cond] = line_currents_dict_t[
+                self.line_currents_mvts[it, cond_idx : cond_idx + n_cond] = line_currents_dict_t[
                     name
-                ][term_row, :]
+                ][term_row, :n_cond]
+                cond_idx += n_cond
                 line_idx += 1
                 line = self.dss.Lines.Next()
-
-            # xfmr flow recording is not implemented; xfmr_currents_mvts stays zero-init.
 
         self.__qsts_complete = True
 
     def get_node_qsts_df(self, node):
-        """
-        Gets the MVTS DF at a specific node
-        """
+        """Return the per-node MVTS dataframe; requires `run()` to have been called first."""
         if self.nodal_mvts_dfs is None:
-            warnings.warn("QSTS has not been run yet, running...")
-            self.run()
-            return self.nodal_mvts_dfs[node]
-        else:
-            return self.nodal_mvts_dfs[node]
+            raise RuntimeError("QSTS has not been run yet; call `.run()` before requesting frames.")
+        return self.nodal_mvts_dfs[node]
 
-    def get_system_deviations(self, granularity=900):
-        """
-        Construct multivariate timeseries datasets of finite differences of:
-            - Voltage magnitudes,
-            - Active powers,
-            - Reactive powers
-        For all buses in the system.
-        Params:
-            D_N (array-like): List or array of N timeseries dictionaries
-            granularity (seconds): Timestep interval used for finite difference approximation of time derivatives
-
-        """
-        N_nodes = self.voltages_mvts.shape[1]  # total number of nodes
-        T_steps = len(self.voltages_mvts) - 1  # total number of timesteps in the deviation vectors
+    def get_system_deviations(self, granularity: float | None = None) -> dict[str, np.ndarray]:
+        """Finite-difference V/P/Q across the QSTS dataset; defaults to `self.time_step` seconds."""
+        if self.voltages_mvts is None or self.complex_powers_mvts is None:
+            raise RuntimeError("QSTS has not been run yet; call `.run()` before deviations.")
+        if granularity is None:
+            granularity = self.time_step
+        N_nodes = self.voltages_mvts.shape[1]
+        T_steps = len(self.voltages_mvts) - 1
         assert (
             T_steps == len(self.complex_powers_mvts) - 1
             and N_nodes == self.complex_powers_mvts.shape[1]
         )
 
-        # preallocate
-        deltaV = np.zeros((N_nodes, T_steps))
-        deltaP = np.zeros((N_nodes, T_steps))
-        deltaQ = np.zeros((N_nodes, T_steps))
-
-        # find deviations
-        for i, v_i in enumerate(np.abs(self.voltages_mvts).T):
-            # voltage deviations
-            deltaV[i, :] = np.diff(v_i) / granularity
-        for i, s_i in enumerate(self.complex_powers_mvts.T):
-            # active power
-            p_i = np.real(s_i)
-            # reactive power
-            q_i = np.imag(s_i)
-            # deviations
-            deltaP[i, :] = np.diff(p_i) / granularity
-            deltaQ[i, :] = np.diff(q_i) / granularity
-        D_diff_N = {"deltaV": deltaV, "deltaP": deltaP, "deltaQ": deltaQ}
-        return D_diff_N
-
-    #  #################################################
-    #  ######### run native OpenDSS QSTS #########
-    #  #################################################
+        deltaV = np.diff(np.abs(self.voltages_mvts), axis=0).T / granularity
+        deltaP = np.diff(np.real(self.complex_powers_mvts), axis=0).T / granularity
+        deltaQ = np.diff(np.imag(self.complex_powers_mvts), axis=0).T / granularity
+        return {"deltaV": deltaV, "deltaP": deltaP, "deltaQ": deltaQ}
 
     def run_native_qsts(self, userDemand=None):
-        """
-        runs a native QSTS simulation from OpenDSS.
-
-        Parameters:
-        ---
-            userDemand:
-        """
+        """Run a native OpenDSS QSTS via Monitors; modifies loadshapes if `userDemand` is given."""
         if userDemand is not None:
             self.setAllLoadShapes(userDemand[0], userDemand[1])
-
-        # run routine with modified loadShapes
         self.__run_native_qsts_duty()
 
     def __run_native_qsts_duty(self):
-        """
-        Run a "Quasi-Static Time-Series" within OpenDSS and get multivariate
-        timeseries a dataset of voltage magnitudes, complex powers, and currents based on Monitors.
-        """
-        # Check QSTS initialization
         self.__check_qsts_initialization(native=True)
-
-        # Run Duty mode qsts
         self.run_command("solve")
 
-        # get monitor information
         voltage_profiles, kw_profiles, kvar_profiles = self.get_monitor_all_loads()
         lineIjk, linePjk, lineQjk = self.get_monitor_all_lines()
         trafoIjk, trafoPjk, trafoQjk = self.get_monitor_all_trafos()
         self.__qsts_complete = True
 
-        # load quantities
         self.loadVolts = voltage_profiles
         self.loadKws = kw_profiles
         self.loadKvars = kvar_profiles
 
-        # line quantities
         self.lineIjks = lineIjk
         self.linePjks = linePjk
         self.lineQjk = lineQjk
 
-        # trafo quantities
         self.trafoIjks = trafoIjk
         self.trafoPjks = trafoPjk
         self.trafoQjk = trafoQjk
 
-    #  ##########################################################
-    #  ######### run QSTS for Power Models Distribution #########
-    #  ##########################################################
-
     def run_PMD_qsts(self):
-        """
-        This method runs a python-based QSTS simulation for populating PMD time_series dictionary.
-
-        Parameters:
-        ---
-            dss: the dss object
-            element: name of the lement
-
-        """
-
-        # run routine with
+        """Run a Python-side QSTS that populates PowerModelsDistribution time-series structures."""
         self.__run_PMD_qsts_duty()
 
     def __run_PMD_qsts_duty(self):
-        """
-        Run a "Quasi-Static Time-Series" simulation and populate a PMD dictionary
-        comprising time_series data for each structure, i.e., voltage magnitudes
-        for buses and active powers for lines, transformers, and loads.
-        """
-
-        # Check QSTS initialization
         self.__check_qsts_initialization()
-
-        # Create all structures
         self.create_buses()
         self.create_lines()
         self.create_xfmrs()
         self.create_loads()
 
-        # Run Duty mode qsts
-        for it in tqdm(range(self.simulation_steps), desc="QSTS running..."):
-            # run routine one set at a time
+        for _ in tqdm(range(self.simulation_steps), desc="QSTS running..."):
             self.run_command("solve")
-
-            # get electrical quantities at time t
             self.read_bus_voltages()
             self.read_line_power()
             self.read_xfmr_power()

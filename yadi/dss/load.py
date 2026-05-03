@@ -30,7 +30,7 @@ class DSS_Load(shunt.DSS_Shunt):
             self.loads.append(load)
 
             load = self.dss.Loads.Next()
-            load_idx += 1  # increment index
+            load_idx += 1
 
     def read_load_power(self):
 

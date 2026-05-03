@@ -19,14 +19,12 @@
 #---
 #JAX imports
 import jax.numpy as jnp
+import optax
 from jax import grad, jit, vmap
 from jax import jacobian
 from jax import random
 #RNG key
 key = random.PRNGKey(0)
-#Gradient descent solvers
-from jaxopt import GradientDescent
-from jaxopt import ProjectedGradient
 #Finite difference function
 from yadi.utils import fdiff
 
@@ -76,13 +74,22 @@ def ridge_reg_objective(sens, lamb, X, y):
     residuals = jnp.dot(X, sens) - y
     return jnp.mean(residuals ** 2) + 0.5 * l2_regularizer(sens,lamb)
 
-def ridge_reg_solution(init_sens,lamb, X, y,maxiter=10000,implicit_diff=True):
-    """
-    Returns the ridge regression sensitivity model solution for a given init_sens, lamb, X, y, and other arguments.
-    """
-    gd = GradientDescent(fun=ridge_reg_objective, maxiter=maxiter, implicit_diff=implicit_diff)
-    sol= gd.run(init_sens, l2reg=lamb, X=X, y=y).params
-    return sol
+def ridge_reg_solution(init_sens, lamb, X, y, maxiter=10000, lr=1e-3):
+    """Ridge-regression solution via an optax.adam loop (was jaxopt.GradientDescent)."""
+    optimizer = optax.adam(lr)
+    opt_state = optimizer.init(init_sens)
+
+    @jit
+    def step(sens, opt_state):
+        grads = grad(ridge_reg_objective)(sens, lamb, X, y)
+        updates, opt_state = optimizer.update(grads, opt_state, sens)
+        sens = optax.apply_updates(sens, updates)
+        return sens, opt_state
+
+    sens = init_sens
+    for _ in range(maxiter):
+        sens, opt_state = step(sens, opt_state)
+    return sens
 
 def solution_jacobian(arg,lamb,X,y,sol=None):
     """

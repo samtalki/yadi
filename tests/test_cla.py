@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from yadi import CLA
 
@@ -36,3 +37,24 @@ def test_cla_fit_pq_splits_coefficients() -> None:
     assert dv2p.shape == (n,)
     assert dv2q.shape == (n,)
     assert intercept.shape == (1,)
+
+    # The split must be correct; swapping halves should make the fit strictly worse.
+    pred = P @ dv2p + Q @ dv2q + intercept
+    pred_swapped = P @ dv2q + Q @ dv2p + intercept
+    assert np.linalg.norm(V - pred) < np.linalg.norm(V - pred_swapped)
+
+
+def test_cla_fit_unconstrained_warns_and_recovers() -> None:
+    """No bounds → warns, falls back to unconstrained l1 fit and tracks the noise-free truth."""
+    rng = np.random.default_rng(2)
+    n_samples, n_features = 64, 3
+    a_true = rng.normal(size=n_features)
+    b_true = 0.25
+    X = rng.normal(size=(n_samples, n_features))
+    y = X @ a_true + b_true + 0.005 * rng.normal(size=n_samples)
+
+    cla = CLA(verbose=False, maxiters=2000)
+    with pytest.warns(UserWarning, match="No upper or lower bounds"):
+        a_hat, b_hat = cla.fit(X, y)
+    assert np.allclose(a_hat, a_true, atol=0.1)
+    assert abs(b_hat - b_true) < 0.1

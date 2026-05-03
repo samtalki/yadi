@@ -65,17 +65,17 @@ class AMIData:
             return data
 
     def get_daytime_datasets(self, inplace: bool = False) -> dict[str, np.ndarray]:
-        """Restrict the loaded P/Q/V matrices to the 9am-3pm window."""
+        """Restrict the loaded P/Q/V matrices to the 9:00-15:59 (9am through 3pm hour) window."""
         if self.nodal_ami_dfs is None:
             df0 = self.get_nodal_ami_dfs()[0]
         else:
             df0 = self.nodal_ami_dfs[0]
         self.daytime_mask = (df0.index.hour >= 9) & (df0.index.hour <= 15)
-        day_data = {}
-        day_data["V"] = self.data["V"][self.daytime_mask, :]
-        day_data["P"] = self.data["P"][self.daytime_mask, :]
-        day_data["Q"] = self.data["Q"][self.daytime_mask, :]
-        return day_data
+        return {
+            "V": self.data["V"][self.daytime_mask, :],
+            "P": self.data["P"][self.daytime_mask, :],
+            "Q": self.data["Q"][self.daytime_mask, :],
+        }
 
     def get_nodal_ami_dfs(self, inplace=False):
         """Make pandas dataframes of (P, Q, V) per node."""

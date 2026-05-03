@@ -12,11 +12,9 @@ dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
     "matplotlib>=3.9",
-    "scipy>=1.13",
     "opendssdirect-py[extras]>=0.9",
     "h5py>=3.11",
     "cvxpy>=1.5",
-    "seaborn>=0.13",
     "tqdm>=4.66",
     "numba>=0.60",
 ]
@@ -24,10 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 research = [
     "jax>=0.4.30",
-    "jaxopt>=0.8",
     "optax>=0.2",
-    "scikit-learn>=1.5",
-    "cvxpylayers>=0.1.6",
 ]
 dev = [
     "pytest>=8",

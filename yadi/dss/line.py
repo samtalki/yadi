@@ -83,7 +83,7 @@ class DSS_Line(bus.DSS_Bus):
             self.branches.append(line)
 
             line = self.dss.Lines.Next()
-            line_idx += 1  # increment index
+            line_idx += 1
 
     def read_line_power(self):
 

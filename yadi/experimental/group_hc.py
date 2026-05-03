@@ -3,7 +3,6 @@
 # Compute an N-dimensional vector of nodal hosting capacities eta
 import jax.numpy as jnp
 from jax import jit,grad,vmap
-from jaxopt.projection import projection_non_negative
 
 def predict_max_unity_gen(sens,v,v_lim=1.05):
     """
@@ -19,7 +18,7 @@ def predict_max_unity_gen(sens,v,v_lim=1.05):
     (Svp,Svq) = sens
     v_dist = v_lim - v
     p_pls = jnp.dot(jnp.linalg.inv(Svp),v_dist)
-    return projection_non_negative(p_pls)
+    return jnp.maximum(p_pls, 0.0)
     
 def objective_max_unity_gen(sens,X,v,v_lim=1.05):
     """

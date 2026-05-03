@@ -1,4 +1,4 @@
-"""Compute the perturb-and-observe Svp matrix on case3_balanced and plot it."""
+"""Compute the perturb and observe Svp matrix on case3_balanced and plot it."""
 
 from pathlib import Path
 

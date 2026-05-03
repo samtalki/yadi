@@ -134,12 +134,9 @@ def drop_nan_rows(X, v):
 
 
 def fdiff(A, norm=1):
-    """Given an (MxN) data matrix A, compute the finite diference matrix DA
-    Params:
-        norm: the amount to normalize A(k+1)-A(k) by
-    """
+    """Forward finite differences of an (M, N) matrix along axis 0, scaled by 1/norm."""
     (M, N) = A.shape
-    DA = np.divide(np.diff(A, axis=0), norm)
+    DA = np.diff(A, axis=0) / norm
     assert DA.shape == (M - 1, N)
     return DA
 

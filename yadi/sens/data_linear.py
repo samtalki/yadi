@@ -1,66 +1,46 @@
 """Linear voltage sensitivity models from data: regression with optional excitation filtering."""
 
 import numpy as np
-from numba import jit, njit
+from numba import jit, njit  # noqa: F401  (jit kept for d_diag/fill_matrix decorators below)
 
 
-@jit(forceobj=True)
 def solve_lsq_filtered(X, v, delta=None, lambd=None, absolute_value=True, filter_var="p"):
-    """
-    Least squares sensitivity model with percentile filtering
-
-    Parameters:
-        X: (m_samples,n_features) array of deviations of power
-        v: (m_samples,n_features) Deviations of voltage magnitudes
-        delta (float): Absolute excitation percentile filter
-        lambd (float): l2 regularization
-    Returns:
-        S: Linear voltage sensitivity model
-
-    """
+    """Least squares fit `s = pinv(X) @ v`; optionally drop low-excitation rows below `delta`."""
     if delta is not None:
         X, v = excitation_filter(X, v, delta, absolute_value=absolute_value, filter_var=filter_var)
+    if X.shape[0] < X.shape[1]:
+        raise ValueError(
+            f"least-squares fit is under-determined: {X.shape[0]} rows, {X.shape[1]} features"
+        )
     s = pinv(X, lambd) @ v
+    # numba's np.linalg.inv returns NaN/inf instead of raising on singular X^T X.
+    if not np.isfinite(s).all():
+        raise np.linalg.LinAlgError(
+            "non-finite least-squares solution; X may be rank-deficient (try lambd > 0)"
+        )
     return s
 
 
 @njit
 def pinv(X, lambd=None):
-    """
-    Psuedoinverse with optional l2 regularization
-
-    X_pinv = (X^T X + lambd*I)^{-1} X^T
-
-    """
+    """Left pseudoinverse `(X^T X + lambd I)^-1 X^T`; lambd=None means plain pinv."""
     X_pinv = gram(X, lambd) @ X.T
     return X_pinv
 
 
 @njit
 def gram(X, lambd=None):
-    """
-    Gram matrix with optional l2 regularization
-    """
+    """Inverse Gram matrix with optional l2 regularization."""
     if lambd is not None:
         return np.linalg.inv(X.T @ X + lambd * np.eye(X.shape[1]))
     else:
         return np.linalg.inv(X.T @ X)
 
 
-@jit(forceobj=True)
 def excitation_filter(
     X, v, quantile, absolute_value=False, filter_var="p", return_idx_filtered=False
 ):
-    """
-    Filter an AMI power array X (P or Q) and voltage target array v according to power excitation quantiles
-    Params:
-        X (ndarray): P, Q, or P/Q load array
-        v (ndarray): Voltage magnitude array
-        quantile (float): Quantile of power injections/perturbations below which observations are discarded.
-        filter_var (str): "p"/"x" or "v", whether to filter according to voltage quantiles (v) or power quantiles (X)
-        absolute_value (bool): Whether to find the quantile w.r.t. to absolute value of the filter_var or not.
-        return_idx_filtered (bool): Whether to return the selected indeces returned from the filter.
-    """
+    """Drop rows of (X, v) whose excitation falls at/below `quantile` of `filter_var` ('p'/'x'/'v')."""
     if filter_var not in ("p", "x", "v"):
         raise ValueError(f"filter_var={filter_var!r} must be one of 'p', 'x', 'v'.")
 
@@ -81,15 +61,8 @@ def excitation_filter(
         return X_filtered, v_filtered
 
 
-@jit(forceobj=True)
 def make_study_slice(study_idx, slice_range, n_nodes=1379):
-    """
-    Generates a neighborhood slice object over the indeces 1,...,n_nodes for a given node study_idx and width slice_range
-    Params:
-        study_idx (int): The index of the node under study
-        n_nodes (int): The number of nodes in the AMI dataset
-        slice_range (int): The width of the neighborhood slice centered around study_idx
-    """
+    """Centered neighborhood slice of width `2*slice_range+1` around `study_idx` in [0, n_nodes)."""
     if slice_range == 0:
         study_slice = study_idx
         local_sp_idx = 0
@@ -115,9 +88,7 @@ def make_study_slice(study_idx, slice_range, n_nodes=1379):
 
 @jit
 def d_diag(X, V, d=3, lambd=2.5e-5, fill_S_matrix=False, fit_offset=False):
-    """
-    Generate structured d-diagonal dynamic mode decomposition/sensitivity matrix. (Default tri-diagonal)
-    """
+    """Structured d-diagonal sensitivity coefficients (default tri-diagonal)."""
     d_M, d_N = X.shape
 
     # Lower diagonal (alpha), diagonal (beta) and upper diagonal (gamma) coefficients
@@ -162,5 +133,5 @@ def d_diag(X, V, d=3, lambd=2.5e-5, fill_S_matrix=False, fit_offset=False):
 
 @jit
 def fill_matrix(S_diag):
-    S = np.diag(S_diag[1, :]) + np.diag(S_diag[2, :-1], 1) + np.diag(S_diag[0, 1:], -1)
-    return S
+    """Assemble a tri-diagonal matrix from `S_diag` rows (lower, main, upper)."""
+    return np.diag(S_diag[1, :]) + np.diag(S_diag[2, :-1], 1) + np.diag(S_diag[0, 1:], -1)

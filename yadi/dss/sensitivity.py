@@ -6,6 +6,10 @@ import yadi.dss.model as model
 
 SensitivityResult = dict[str, object]
 
+# Tied to the divisor in __calc_sens_mat — change both at once or sensitivities scale wrong.
+_PERTURB_KW = 100.0
+_PERTURB_KVAR = 100.0
+
 
 class DSS_Sensitivities(model.DSS_Data):
     """Compute perturb and observe sensitivity matrices."""
@@ -67,12 +71,14 @@ class DSS_Sensitivities(model.DSS_Data):
                 print("Node Perturbed: ", node)
             if dep_var in ("P", "p"):
                 vph_perturbed = self.__get_perturbed_nodal_voltages(
-                    bus_name=node, phases=1, kw_inj=-100, kvar_inj=0
+                    bus_name=node, phases=1, kw_inj=-_PERTURB_KW, kvar_inj=0
                 )
+                magnitude = _PERTURB_KW
             elif dep_var in ("Q", "q"):
                 vph_perturbed = self.__get_perturbed_nodal_voltages(
-                    bus_name=node, phases=1, kw_inj=0, kvar_inj=-100
+                    bus_name=node, phases=1, kw_inj=0, kvar_inj=-_PERTURB_KVAR
                 )
+                magnitude = _PERTURB_KVAR
             else:
                 raise ValueError(f"Invalid dependent variable: {dep_var}")
             vph_perturbed_yorder = [vph_perturbed[i] for i in nodes]
@@ -80,12 +86,12 @@ class DSS_Sensitivities(model.DSS_Data):
             if indp_var == "vmag":
                 S_matrix[:, col_idx] = (
                     np.abs(np.asarray(vph_perturbed_yorder)) - np.abs(np.asarray(vph_base_yorder))
-                ) / (100)
+                ) / magnitude
             elif indp_var == "theta":
                 S_matrix[:, col_idx] = (
                     np.angle(np.asarray(vph_perturbed_yorder))
                     - np.angle(np.asarray(vph_base_yorder))
-                ) / (100)
+                ) / magnitude
             else:
                 raise ValueError(f"Invalid independent variable: {indp_var}")
 

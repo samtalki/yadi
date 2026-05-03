@@ -1,4 +1,4 @@
-"""Conservative linear approximation: l1 regression with optional inequality constraints."""
+"""Conservative linear approximation via l1 regression with optional inequality constraints."""
 
 import warnings
 
@@ -7,8 +7,6 @@ import numpy as np
 
 
 class CLA:
-    """Fit a conservative (one-sided) linear approximation via constrained l1 regression."""
-
     def __init__(
         self,
         verbose: bool = True,

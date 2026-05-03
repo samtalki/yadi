@@ -1,5 +1,3 @@
-import math
-
 import pandas as pd
 
 import yadi.dss.line as line
@@ -26,7 +24,7 @@ class DSS_Transformer(line.DSS_Line):
 
             # move to next regulator
             reg = self.dss.RegControls.Next()
-            reg_idx += 1  # increment index
+            reg_idx += 1
 
     def create_xfmrs(self):
 
@@ -112,7 +110,7 @@ class DSS_Transformer(line.DSS_Line):
             self.branches.append(xfmr)
 
             xfmr = self.dss.Transformers.Next()
-            xfmr_idx += 1  # increment index
+            xfmr_idx += 1
 
     def get_perWindingQuantities(self):
 
@@ -134,50 +132,30 @@ class DSS_Transformer(line.DSS_Line):
         return kV, R
 
     def read_xfmr_power(self):
-
         for xfmr in self.branches:
-            if xfmr["transformer"]:
-                # get xfmr uid
-                uid = xfmr["uid"]
+            if not xfmr["transformer"]:
+                continue
+            uid = xfmr["uid"]
+            self.dss.Circuit.SetActiveElement(f"Transformer.{uid}")
 
-                # set active xfmr
-                self.dss.Circuit.SetActiveElement(f"Transformer.{uid}")
-                ir = [
-                    i
-                    for i in self.dss.CktElement.Currents()[0::2]
-                    if not math.isclose(i, 0.0, rel_tol=1e-20)
-                ]
-                ii = [
-                    i
-                    for i in self.dss.CktElement.Currents()[1::2]
-                    if not math.isclose(i, 0.0, rel_tol=1e-20)
-                ]
+            currents = self.dss.CktElement.Currents()
+            powers = self.dss.CktElement.Powers()
+            ir = currents[0::2]
+            ii = currents[1::2]
+            p = powers[0::2]
+            q = powers[1::2]
 
-                # get xfmr active powers
-                p = [
-                    i
-                    for i in self.dss.CktElement.Powers()[0::2]
-                    if not math.isclose(i, 0.0, rel_tol=1e-20)
-                ]
-                q = [
-                    i
-                    for i in self.dss.CktElement.Powers()[1::2]
-                    if not math.isclose(i, 0.0, rel_tol=1e-20)
-                ]
-
-                # get number of nodes
-                nodes = xfmr["nodes"]
-
-                # create voltage magnitude container for each xfmr-terminal combination
-                for n, node in enumerate(nodes):
-                    xfmr["ir_ij"][f"{node}"].append(ir[n])
-                    xfmr["ii_ij"][f"{node}"].append(ii[n])
-                    xfmr["ir_ji"][f"{node}"].append(ir[int(len(p) / 2) + n])
-                    xfmr["ii_ji"][f"{node}"].append(ii[int(len(p) / 2) + n])
-                    xfmr["pij"][f"{node}"].append(p[n])
-                    xfmr["qij"][f"{node}"].append(q[n])
-                    xfmr["pji"][f"{node}"].append(p[int(len(p) / 2) + n])
-                    xfmr["qji"][f"{node}"].append(q[int(len(q) / 2) + n])
+            nodes = xfmr["nodes"]
+            half = len(p) // 2
+            for n, node in enumerate(nodes):
+                xfmr["ir_ij"][f"{node}"].append(ir[n])
+                xfmr["ii_ij"][f"{node}"].append(ii[n])
+                xfmr["ir_ji"][f"{node}"].append(ir[half + n])
+                xfmr["ii_ji"][f"{node}"].append(ii[half + n])
+                xfmr["pij"][f"{node}"].append(p[n])
+                xfmr["qij"][f"{node}"].append(q[n])
+                xfmr["pji"][f"{node}"].append(p[half + n])
+                xfmr["qji"][f"{node}"].append(q[half + n])
 
     def get_trafoEAmps(self):
         "Method to extract transformers emergency amps"
